@@ -1,7 +1,12 @@
+import { useState } from 'react'
+
 import { AdminButton } from '../admin/components/AdminButton'
+import { AdminPanel } from '../admin/components/AdminPanel'
 import { GameCanvas } from '../game/components/GameCanvas'
 
 export function App() {
+  const [isAdminOpen, setIsAdminOpen] = useState(false)
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -13,10 +18,11 @@ export function App() {
             administrativo.
           </p>
         </div>
-        <AdminButton />
+        <AdminButton onClick={() => setIsAdminOpen(true)} />
       </header>
 
       <GameCanvas />
+      <AdminPanel isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} />
     </main>
   )
 }

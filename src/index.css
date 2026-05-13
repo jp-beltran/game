@@ -106,9 +106,95 @@ textarea {
   filter: brightness(1.04);
 }
 
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: none;
+}
+
 .button:focus-visible {
   outline: 3px solid #90a955;
   outline-offset: 3px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(19, 42, 19, 0.4);
+  backdrop-filter: blur(6px);
+  z-index: 20;
+}
+
+.modal-shell {
+  width: min(100%, 42rem);
+  max-height: min(90vh, 52rem);
+  overflow: auto;
+  padding: 1.25rem;
+  border: 1px solid rgba(19, 42, 19, 0.12);
+  border-radius: 24px;
+  background: #f8f7f0;
+  box-shadow: 0 30px 70px rgba(19, 42, 19, 0.18);
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.modal-header h2 {
+  margin: 0;
+}
+
+.modal-close {
+  border: 0;
+  background: transparent;
+  color: #31572c;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.prompt-console {
+  display: grid;
+  gap: 1rem;
+}
+
+.prompt-label,
+.prompt-history h3 {
+  font-weight: 700;
+}
+
+.prompt-textarea {
+  width: 100%;
+  min-height: 10rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(19, 42, 19, 0.2);
+  border-radius: 16px;
+  resize: vertical;
+  background: #fff;
+}
+
+.prompt-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.prompt-status,
+.prompt-message,
+.prompt-history p,
+.prompt-history ul {
+  margin: 0;
+}
+
+.prompt-history ul {
+  padding-left: 1.2rem;
 }
 
 @media (max-width: 720px) {
@@ -123,5 +209,10 @@ textarea {
 
   .admin-button {
     width: 100%;
+  }
+
+  .prompt-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
