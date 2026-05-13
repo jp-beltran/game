@@ -63,6 +63,7 @@ textarea {
 }
 
 .game-shell {
+  position: relative;
   min-height: 65vh;
   overflow: hidden;
   border: 1px solid rgba(19, 42, 19, 0.16);
@@ -75,6 +76,19 @@ textarea {
   display: block;
   width: 100% !important;
   height: 100% !important;
+}
+
+.player-position-debug {
+  position: absolute;
+  left: 1rem;
+  bottom: 1rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 12px;
+  color: #f8f7f0;
+  background: rgba(19, 42, 19, 0.8);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 
 .button {

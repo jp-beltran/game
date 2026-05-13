@@ -20,7 +20,7 @@ const DEFAULT_SPEED = 4
 export function usePlayerController(options: PlayerControllerOptions = {}) {
   const { initialPosition = DEFAULT_POSITION, speed = DEFAULT_SPEED } = options
   const input = useKeyboardMovement()
-  const [position, setPosition] = useState<Position3D>(initialPosition)
+  const [position, setPosition] = useState<Position3D>({ ...initialPosition })
 
   function update(delta: number) {
     setPosition((currentPosition) =>

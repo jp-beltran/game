@@ -1,4 +1,13 @@
-export function World() {
+import { Player } from './Player'
+import { ThirdPersonCamera } from './ThirdPersonCamera'
+import type { Position3D } from '../types/game'
+
+type WorldProps = {
+  playerPosition: Position3D
+  onPlayerFrame: (delta: number) => void
+}
+
+export function World({ playerPosition, onPlayerFrame }: WorldProps) {
   return (
     <>
       <color attach="background" args={['#d6e4f0']} />
@@ -9,11 +18,8 @@ export function World() {
         <planeGeometry args={[40, 40]} />
         <meshStandardMaterial color="#7ca982" />
       </mesh>
-
-      <mesh castShadow position={[0, 0, 0]}>
-        <capsuleGeometry args={[0.45, 1.1, 6, 12]} />
-        <meshStandardMaterial color="#2f4858" />
-      </mesh>
+      <Player onFrame={onPlayerFrame} position={playerPosition} />
+      <ThirdPersonCamera target={playerPosition} />
     </>
   )
 }
