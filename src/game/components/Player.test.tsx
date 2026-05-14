@@ -7,7 +7,21 @@ vi.mock('@react-three/fiber', () => ({
 }))
 
 describe('Player', () => {
-  it('renders the player body with the updated color', () => {
+  it('renders a minimalist knight silhouette instead of a single capsule', () => {
+    render(
+      <Player
+        position={{ x: 0, y: 0, z: 0 }}
+        onFrame={vi.fn()}
+      />,
+    )
+
+    expect(document.querySelector('[data-testid="player-model"]')).toBeInTheDocument()
+    expect(document.querySelector('[data-testid="player-torso"]')).toBeInTheDocument()
+    expect(document.querySelector('[data-testid="player-helmet"]')).toBeInTheDocument()
+    expect(document.querySelector('[data-testid="player-shield"]')).toBeInTheDocument()
+  })
+
+  it('uses a muted steel palette for the main armor pieces', () => {
     const { container } = render(
       <Player
         position={{ x: 0, y: 0, z: 0 }}
@@ -16,7 +30,7 @@ describe('Player', () => {
     )
 
     expect(
-      container.querySelector('meshstandardmaterial'),
-    ).toHaveAttribute('color', '#90a955')
+      container.querySelector('meshstandardmaterial[color="#c0c0c0"]'),
+    ).toBeInTheDocument()
   })
 })

@@ -37,6 +37,14 @@ describe('GameCanvas', () => {
     expect(screen.getByTestId('player-model')).toBeInTheDocument()
   })
 
+  it('renders the diorama landmarks around the player', () => {
+    render(<GameCanvas />)
+
+    expect(screen.getByTestId('world-plaza')).toBeInTheDocument()
+    expect(screen.getByTestId('world-house-west')).toBeInTheDocument()
+    expect(screen.getByTestId('world-border-north')).toBeInTheDocument()
+  })
+
   it('shows the player position debug in test environment', () => {
     render(<GameCanvas />)
 
