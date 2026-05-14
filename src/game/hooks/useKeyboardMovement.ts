@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 
-import { updateDirectionInput } from '../engine/input'
+import {
+  shouldProcessMovementKey,
+  updateDirectionInput,
+} from '../engine/input'
 import type { DirectionInput } from '../types/game'
 
 const INITIAL_INPUT: DirectionInput = {
@@ -15,10 +18,19 @@ export function useKeyboardMovement(): DirectionInput {
 
   useEffect(() => {
     function handleKeydown(event: KeyboardEvent) {
+      if (!shouldProcessMovementKey(event)) {
+        return
+      }
+
+      event.preventDefault()
       setInput((currentInput) => updateDirectionInput(currentInput, event.key, true))
     }
 
     function handleKeyup(event: KeyboardEvent) {
+      if (!shouldProcessMovementKey(event)) {
+        return
+      }
+
       setInput((currentInput) => updateDirectionInput(currentInput, event.key, false))
     }
 

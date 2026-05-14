@@ -91,6 +91,28 @@ describe('useKeyboardMovement', () => {
     expect(result.current).toEqual(createInput())
   })
 
+  it('ignores movement keys while typing in an editable field', () => {
+    const textarea = document.createElement('textarea')
+    document.body.appendChild(textarea)
+    textarea.focus()
+
+    const { result, unmount } = renderHook(() => useKeyboardMovement())
+
+    act(() => {
+      textarea.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          key: 'w',
+        }),
+      )
+    })
+
+    expect(result.current).toEqual(createInput())
+
+    unmount()
+    textarea.remove()
+  })
+
   it('registers and cleans up keyboard listeners on unmount', () => {
     const addEventListenerSpy = vi.spyOn(window, 'addEventListener')
     const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener')
@@ -141,6 +163,6 @@ describe('usePlayerController', () => {
     })
 
     expect(result.current.input).toEqual(createInput({ forward: true }))
-    expect(result.current.position).toEqual({ x: 0, y: 0, z: 2 })
+    expect(result.current.position).toEqual({ x: 0, y: 0, z: -2 })
   })
 })

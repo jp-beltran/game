@@ -20,28 +20,28 @@ describe('calculateNextPosition', () => {
     expect(result).toEqual(origin)
   })
 
-  it('moves forward on the z axis', () => {
+  it('moves forward relative to the camera', () => {
     const result = calculateNextPosition(origin, createInput({ forward: true }), 1, 4)
 
-    expect(result).toEqual({ x: 0, y: 0, z: 4 })
+    expect(result).toEqual({ x: 0, y: 0, z: -4 })
   })
 
   it('moves backward on the opposite z direction', () => {
     const result = calculateNextPosition(origin, createInput({ backward: true }), 1, 4)
 
-    expect(result).toEqual({ x: 0, y: 0, z: -4 })
+    expect(result).toEqual({ x: 0, y: 0, z: 4 })
   })
 
   it('moves left on the x axis', () => {
     const result = calculateNextPosition(origin, createInput({ left: true }), 1, 4)
 
-    expect(result).toEqual({ x: 4, y: 0, z: 0 })
+    expect(result).toEqual({ x: -4, y: 0, z: 0 })
   })
 
   it('moves right on the opposite x direction', () => {
     const result = calculateNextPosition(origin, createInput({ right: true }), 1, 4)
 
-    expect(result).toEqual({ x: -4, y: 0, z: 0 })
+    expect(result).toEqual({ x: 4, y: 0, z: 0 })
   })
 
   it('normalizes diagonal movement', () => {
@@ -52,20 +52,20 @@ describe('calculateNextPosition', () => {
       4,
     )
 
-    expect(result.x).toBeCloseTo(2.828427, 5)
-    expect(result.z).toBeCloseTo(2.828427, 5)
+    expect(result.x).toBeCloseTo(-2.828427, 5)
+    expect(result.z).toBeCloseTo(-2.828427, 5)
   })
 
   it('respects delta', () => {
     const result = calculateNextPosition(origin, createInput({ forward: true }), 0.5, 4)
 
-    expect(result).toEqual({ x: 0, y: 0, z: 2 })
+    expect(result).toEqual({ x: 0, y: 0, z: -2 })
   })
 
   it('respects speed', () => {
     const result = calculateNextPosition(origin, createInput({ forward: true }), 1, 7.5)
 
-    expect(result).toEqual({ x: 0, y: 0, z: 7.5 })
+    expect(result).toEqual({ x: 0, y: 0, z: -7.5 })
   })
 
   it('does not mutate the original position object', () => {

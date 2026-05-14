@@ -19,7 +19,7 @@ export function Player({ position, onFrame }: PlayerProps) {
     >
       <mesh castShadow position={[0, 0.8, 0]}>
         <capsuleGeometry args={[0.45, 1.1, 6, 12]} />
-        <meshStandardMaterial color="#2f4858" />
+        <meshStandardMaterial color="#90a955" />
       </mesh>
     </group>
   )

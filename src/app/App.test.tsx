@@ -20,12 +20,12 @@ describe('App', () => {
     vi.mocked(codexAgentService.sendMessage).mockReset()
   })
 
-  it('renders the game shell heading', () => {
+  it('does not render the old page header layout', () => {
     render(<App />)
 
     expect(
-      screen.getByRole('heading', { name: /third person rpg mvp/i }),
-    ).toBeInTheDocument()
+      screen.queryByRole('heading', { name: /third person rpg mvp/i }),
+    ).not.toBeInTheDocument()
   })
 
   it('renders the game container', () => {

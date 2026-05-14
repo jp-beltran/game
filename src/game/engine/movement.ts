@@ -1,7 +1,7 @@
 import type { DirectionInput, Position3D } from '../types/game'
 
 function resolveAxis(negativeDirection: boolean, positiveDirection: boolean) {
-  return Number(negativeDirection) - Number(positiveDirection)
+  return Number(positiveDirection) - Number(negativeDirection)
 }
 
 export function calculateNextPosition(
