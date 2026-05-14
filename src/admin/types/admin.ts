@@ -22,4 +22,5 @@ export type ChatMessage = {
   id: string
   content: string
   author: 'user' | 'assistant'
+  transient?: boolean
 }

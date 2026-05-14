@@ -7,8 +7,13 @@ type CodexAgentServiceOptions = {
   fetchFn?: typeof fetch
 }
 
+type SendMessageOptions = {
+  signal?: AbortSignal
+}
+
 async function sendMessageWithLocalBackend(
   request: CodexChatRequest,
+  options: SendMessageOptions,
   fetchFn: typeof fetch,
 ): Promise<CodexChatResponse> {
   const response = await fetchFn(CODEX_AGENT_PROMPT_ENDPOINT_VALUE, {
@@ -17,6 +22,7 @@ async function sendMessageWithLocalBackend(
       'Content-Type': 'application/json',
     },
     method: 'POST',
+    signal: options.signal,
   })
   const responseBody = (await response.json().catch(() => null)) as
     | { message?: string }
@@ -34,8 +40,11 @@ export function createCodexAgentService({
   fetchFn = fetch,
 }: CodexAgentServiceOptions = {}) {
   return {
-    async sendMessage(request: CodexChatRequest): Promise<CodexChatResponse> {
-      return sendMessageWithLocalBackend(request, fetchFn)
+    async sendMessage(
+      request: CodexChatRequest,
+      options: SendMessageOptions = {},
+    ): Promise<CodexChatResponse> {
+      return sendMessageWithLocalBackend(request, options, fetchFn)
     },
   }
 }

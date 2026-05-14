@@ -5,6 +5,7 @@ import type { CodexExecutionMode } from '../../src/admin/types/admin'
 export type CodexCliRunRequest = {
   executionMode: CodexExecutionMode
   prompt: string
+  signal?: AbortSignal
   timeoutMs: number
   workspaceRoot: string
 }
@@ -55,6 +56,7 @@ export function createCodexCliRunner({
     async run({
       executionMode,
       prompt,
+      signal,
       timeoutMs,
       workspaceRoot,
     }: CodexCliRunRequest): Promise<string> {
@@ -79,16 +81,33 @@ export function createCodexCliRunner({
         let isSettled = false
         let stdout = ''
         let stderr = ''
+        const abortHandler = () => {
+          if (isSettled) {
+            return
+          }
+
+          isSettled = true
+          clearTimeout(timeoutHandle)
+          childProcess.kill('SIGTERM')
+          reject(new DOMException('Aborted', 'AbortError'))
+        }
         const timeoutHandle = setTimeout(() => {
           if (isSettled) {
             return
           }
 
           isSettled = true
+          signal?.removeEventListener('abort', abortHandler)
           childProcess.kill('SIGTERM')
           reject(new Error(`Codex CLI excedeu o timeout de ${timeoutMs}ms.`))
         }, timeoutMs)
 
+        if (signal?.aborted) {
+          abortHandler()
+          return
+        }
+
+        signal?.addEventListener('abort', abortHandler, { once: true })
         childProcess.stdin.end()
         childProcess.stdout.on('data', (chunk: Buffer | string) => {
           stdout += chunk.toString()
@@ -104,6 +123,7 @@ export function createCodexCliRunner({
 
           isSettled = true
           clearTimeout(timeoutHandle)
+          signal?.removeEventListener('abort', abortHandler)
           reject(error)
         })
 
@@ -114,6 +134,7 @@ export function createCodexCliRunner({
 
           isSettled = true
           clearTimeout(timeoutHandle)
+          signal?.removeEventListener('abort', abortHandler)
 
           if (code !== 0) {
             reject(

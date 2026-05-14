@@ -27,6 +27,10 @@ function sendJson(
   response.end(JSON.stringify(payload))
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError'
+}
+
 async function readJsonBody(request: IncomingMessage): Promise<unknown> {
   const chunks: Uint8Array[] = []
 
@@ -115,6 +119,12 @@ export function createAdminAgentApiHandler({
     }
 
     try {
+      const abortController = new AbortController()
+
+      request.once('aborted', () => {
+        abortController.abort()
+      })
+
       const body = await readJsonBody(request)
       const validationError = validateChatRequest(body)
 
@@ -123,9 +133,19 @@ export function createAdminAgentApiHandler({
         return
       }
 
-      const result = await adapter.sendMessage(body as CodexChatRequest)
+      const result = await adapter.sendMessage(body as CodexChatRequest, {
+        signal: abortController.signal,
+      })
       sendJson(response, 200, result)
     } catch (error) {
+      if (isAbortError(error)) {
+        if (!response.writableEnded) {
+          response.statusCode = 499
+          response.end()
+        }
+        return
+      }
+
       sendJson(response, 500, {
         message:
           error instanceof Error

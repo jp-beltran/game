@@ -1,43 +1,26 @@
 import type { CodexChatRequest, CodexChatResponse } from '../../src/admin/types/admin'
 import { createCodexCliRunner, type CodexCliRunner } from './codexCliRunner'
+import {
+  createGameProjectContextBuilder,
+  type GameProjectContextBuilder,
+} from './gameProjectContext'
 
 function createPromptId() {
   return globalThis.crypto?.randomUUID?.() ?? `prompt-${Date.now()}`
 }
 
-const CONFIRMATION_INSTRUCTION =
-  'Se quiser que eu implemente, responda com: sim, ok ou manda ver.'
-
 export type CodexAgentAdapter = {
   sendMessage: (
     request: CodexChatRequest,
+    options?: { signal?: AbortSignal },
   ) => Promise<CodexChatResponse>
 }
 
 type CreateCodexAgentAdapterOptions = {
+  projectContextBuilder?: GameProjectContextBuilder
   runner?: CodexCliRunner
   timeoutMs?: number
   workspaceRoot?: string
-}
-
-function isAffirmativeMessage(message: string): boolean {
-  const normalizedMessage = message.trim().toLowerCase()
-
-  return ['sim', 'ok', 'manda ver'].includes(normalizedMessage)
-}
-
-function hasPendingImplementation(conversation: CodexChatRequest['conversation']): boolean {
-  const lastMessage = conversation.at(-1)?.content ?? ''
-
-  return lastMessage.toLowerCase().includes(CONFIRMATION_INSTRUCTION.toLowerCase())
-}
-
-function shouldExecuteImplementation(request: CodexChatRequest): boolean {
-  return isAffirmativeMessage(request.message) && hasPendingImplementation(request.conversation)
-}
-
-function shouldAwaitConfirmation(response: string): boolean {
-  return response.toLowerCase().includes(CONFIRMATION_INSTRUCTION.toLowerCase())
 }
 
 function buildConversationSummary(conversation: CodexChatRequest['conversation']): string {
@@ -56,20 +39,19 @@ function buildConversationSummary(conversation: CodexChatRequest['conversation']
 
 function buildAgentPrompt(
   request: CodexChatRequest,
-  executionMode: 'read-only' | 'workspace-write',
+  projectContext: string,
 ): string {
-  const modeInstruction =
-    executionMode === 'workspace-write'
-      ? 'O usuário acabou de autorizar explicitamente a implementação. Execute a mudança necessária no workspace e responda com o resultado.'
-      : [
-          'Converse normalmente como um assistente técnico.',
-          'Se a melhor resposta exigir implementação, não implemente ainda.',
-          `Explique brevemente e termine exatamente com esta frase: ${CONFIRMATION_INSTRUCTION}`,
-        ].join(' ')
-
   return [
-    'Você está respondendo a uma conversa enviada por um chat flutuante local.',
-    modeInstruction,
+    'Você é o agente local do jogo respondendo a um chat flutuante dentro do projeto.',
+    'Use o contexto automatico abaixo antes de decidir onde mexer.',
+    'Priorize src/game para interpretar pedidos sobre mapa, personagem, animacoes, camera, input e mundo.',
+    'Se houver mais de um alvo plausivel, escolha o mais provavel, implemente e explicite a suposicao na resposta.',
+    'Se o pedido nao fechar no jogo, expanda para o resto do repositorio.',
+    'Voce tem autonomia para editar o workspace diretamente quando o pedido indicar mudanca no codigo ou no jogo.',
+    'Se o usuario estiver apenas fazendo uma pergunta, responda normalmente, mas com base no contexto encontrado.',
+    '',
+    projectContext,
+    '',
     buildConversationSummary(request.conversation),
     '',
     'Nova mensagem do usuário:',
@@ -78,19 +60,22 @@ function buildAgentPrompt(
 }
 
 export function createCodexAgentAdapter({
+  projectContextBuilder = createGameProjectContextBuilder(),
   runner = createCodexCliRunner(),
   timeoutMs = Number(process.env.CODEX_AGENT_TIMEOUT_MS ?? 120000),
   workspaceRoot = process.cwd(),
 }: CreateCodexAgentAdapterOptions = {}): CodexAgentAdapter {
   return {
-    async sendMessage(request) {
-      const executionMode = shouldExecuteImplementation(request)
-        ? 'workspace-write'
-        : 'read-only'
+    async sendMessage(request, options = {}) {
+      const projectContext = await projectContextBuilder.build({
+        message: request.message,
+        workspaceRoot,
+      })
 
       const response = await runner.run({
-        executionMode,
-        prompt: buildAgentPrompt(request, executionMode),
+        executionMode: 'workspace-write',
+        prompt: buildAgentPrompt(request, projectContext),
+        signal: options.signal,
         timeoutMs,
         workspaceRoot,
       })
@@ -99,7 +84,7 @@ export function createCodexAgentAdapter({
         id: createPromptId(),
         status: 'completed',
         message: response,
-        pendingConfirmation: shouldAwaitConfirmation(response),
+        pendingConfirmation: false,
       }
     },
   }

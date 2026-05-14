@@ -12,6 +12,11 @@ vi.mock('@react-three/fiber', async () => {
       <div data-testid="r3f-canvas">{children}</div>
     ),
     useFrame: vi.fn(),
+    useLoader: vi.fn(() => ({
+      scene: {
+        clone: () => ({ mocked: true }),
+      },
+    })),
     useThree: () => ({
       camera: {
         position: {
@@ -43,6 +48,13 @@ describe('GameCanvas', () => {
     expect(container.querySelector('mesh[name="hex-tile-0-0"]')).toBeInTheDocument()
     expect(container.querySelector('mesh[name="hex-tile-1--1"]')).toBeInTheDocument()
     expect(container.querySelectorAll('mesh[data-biome]').length).toBeGreaterThan(12)
+  })
+
+  it('renders simple trees as world scenery away from the spawn tile', () => {
+    const { container } = render(<GameCanvas />)
+
+    expect(container.querySelectorAll('group[data-scenery="tree"]').length).toBeGreaterThanOrEqual(8)
+    expect(container.querySelector('group[name="world-tree-0-0"]')).not.toBeInTheDocument()
   })
 
   it('shows the player position debug in test environment', () => {

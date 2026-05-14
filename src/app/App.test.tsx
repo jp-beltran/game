@@ -16,6 +16,24 @@ vi.mock('../admin/services/codexAgentService', () => ({
 }))
 
 describe('App', () => {
+  function getChatTextarea() {
+    return screen.getByRole('textbox', { name: /prompt do chat/i })
+  }
+
+  function typeInChatTextarea(value: string) {
+    fireEvent.change(getChatTextarea(), {
+      target: { value },
+    })
+  }
+
+  function appendToChatTextarea(value: string) {
+    typeInChatTextarea(`${getChatTextarea().value}${value}`)
+  }
+
+  function expectChatValueToContain(value: string) {
+    expect(getChatTextarea().value).toContain(value)
+  }
+
   beforeEach(() => {
     vi.mocked(codexAgentService.sendMessage).mockReset()
   })
@@ -53,13 +71,9 @@ describe('App', () => {
   it('accepts typing in the chat textarea', () => {
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText(/mensagem para o codex/i), {
-      target: { value: 'Criar sistema de inventário.' },
-    })
+    typeInChatTextarea('Criar sistema de inventário.')
 
-    expect(screen.getByLabelText(/mensagem para o codex/i)).toHaveValue(
-      'Criar sistema de inventário.',
-    )
+    expect(getChatTextarea()).toHaveValue('Criar sistema de inventário.')
   })
 
   it('keeps the submit button disabled when the textarea is empty', () => {
@@ -80,16 +94,19 @@ describe('App', () => {
 
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText(/mensagem para o codex/i), {
-      target: { value: 'Implementar inventário simples.' },
-    })
+    typeInChatTextarea('Implementar inventário simples.')
     fireEvent.click(screen.getByRole('button', { name: /enviar mensagem/i }))
 
     await waitFor(() => {
-      expect(codexAgentService.sendMessage).toHaveBeenCalledWith({
-        message: 'Implementar inventário simples.',
-        conversation: [],
-      })
+      expect(codexAgentService.sendMessage).toHaveBeenCalledWith(
+        {
+          message: 'Implementar inventário simples.',
+          conversation: [],
+        },
+        expect.objectContaining({
+          signal: expect.any(AbortSignal),
+        }),
+      )
     })
   })
 
@@ -103,15 +120,15 @@ describe('App', () => {
 
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText(/mensagem para o codex/i), {
-      target: { value: 'Adicionar quests.' },
-    })
+    typeInChatTextarea('Adicionar quests.')
     fireEvent.click(screen.getByRole('button', { name: /enviar mensagem/i }))
 
-    expect(await screen.findByText('Adicionar quests.')).toBeInTheDocument()
-    expect(
-      await screen.findByText(/comece por uma lista simples de itens no estado local/i),
-    ).toBeInTheDocument()
+    await waitFor(() => {
+      expectChatValueToContain('Você: Adicionar quests.')
+    })
+    expectChatValueToContain(
+      'Codex: Comece por uma lista simples de itens no estado local.',
+    )
   })
 
   it('shows submitting while the request is in flight', async () => {
@@ -135,12 +152,15 @@ describe('App', () => {
 
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText(/mensagem para o codex/i), {
-      target: { value: 'Adicionar crafting.' },
-    })
+    typeInChatTextarea('Adicionar crafting.')
     fireEvent.click(screen.getByRole('button', { name: /enviar mensagem/i }))
 
-    expect(screen.getByText(/status: submitting/i)).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /cancelar/i }),
+    ).toBeInTheDocument()
+    expectChatValueToContain(
+      'Codex: Estou analisando o jogo e implementando isso agora.',
+    )
 
     resolvePrompt?.({
       id: 'prompt-1',
@@ -149,7 +169,35 @@ describe('App', () => {
       pendingConfirmation: false,
     })
 
-    await screen.findByText(/status: success/i)
+    await waitFor(() => {
+      expect(getChatTextarea().value).not.toContain(
+        'Codex: Estou analisando o jogo e implementando isso agora.',
+      )
+    })
+  })
+
+  it('cancels the in-flight request from the same action button', async () => {
+    vi.mocked(codexAgentService.sendMessage).mockImplementation(
+      (_request, options) =>
+        new Promise((_resolve, reject) => {
+          options?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'))
+          })
+        }),
+    )
+
+    render(<App />)
+
+    typeInChatTextarea('Adicionar crafting.')
+    fireEvent.click(screen.getByRole('button', { name: /enviar mensagem/i }))
+
+    fireEvent.click(screen.getByRole('button', { name: /cancelar/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /enviar mensagem/i })).toBeDisabled()
+    })
+    expectChatValueToContain('Você: Adicionar crafting.')
+    expect(screen.queryByRole('button', { name: /cancelar/i })).not.toBeInTheDocument()
   })
 
   it('shows success after a successful submission', async () => {
@@ -162,54 +210,53 @@ describe('App', () => {
 
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText(/mensagem para o codex/i), {
-      target: { value: 'Adicionar HUD.' },
-    })
+    typeInChatTextarea('Adicionar HUD.')
     fireEvent.click(screen.getByRole('button', { name: /enviar mensagem/i }))
 
-    expect(await screen.findByText(/status: success/i)).toBeInTheDocument()
+    await waitFor(() => {
+      expectChatValueToContain('Codex: Uma HUD mínima já resolve o próximo passo.')
+    })
   })
 
-  it('uses the previous conversation when the user confirms a pending implementation', async () => {
+  it('uses the previous conversation on a normal follow-up message', async () => {
     vi.mocked(codexAgentService.sendMessage)
       .mockResolvedValueOnce({
         id: 'prompt-1',
         status: 'completed',
-        message:
-          'Posso criar um sistema de save em arquivo local como próximo passo. Se quiser que eu implemente, responda com: sim, ok ou manda ver.',
-        pendingConfirmation: true,
+        message: 'Implementei o save inicial.',
+        pendingConfirmation: false,
       })
       .mockResolvedValueOnce({
         id: 'prompt-2',
         status: 'completed',
-        message: 'Implementei o save inicial.',
+        message: 'Ajustei o feedback visual do save.',
         pendingConfirmation: false,
       })
 
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText(/mensagem para o codex/i), {
-      target: { value: 'Adicionar save game.' },
-    })
+    typeInChatTextarea('Adicionar save game.')
     fireEvent.click(screen.getByRole('button', { name: /enviar mensagem/i }))
-    await screen.findByText(/responda com: sim, ok ou manda ver/i)
-
-    fireEvent.change(screen.getByLabelText(/mensagem para o codex/i), {
-      target: { value: 'ok' },
+    await waitFor(() => {
+      expectChatValueToContain('Codex: Implementei o save inicial.')
     })
+
+    appendToChatTextarea('Ajuste também o feedback visual.')
     fireEvent.click(screen.getByRole('button', { name: /enviar mensagem/i }))
 
     await waitFor(() => {
-      expect(codexAgentService.sendMessage).toHaveBeenLastCalledWith({
-        message: 'ok',
-        conversation: [
-          { content: 'Adicionar save game.' },
-          {
-            content:
-              'Posso criar um sistema de save em arquivo local como próximo passo. Se quiser que eu implemente, responda com: sim, ok ou manda ver.',
-          },
-        ],
-      })
+      expect(codexAgentService.sendMessage).toHaveBeenLastCalledWith(
+        {
+          message: 'Ajuste também o feedback visual.',
+          conversation: [
+            { content: 'Adicionar save game.' },
+            { content: 'Implementei o save inicial.' },
+          ],
+        },
+        expect.objectContaining({
+          signal: expect.any(AbortSignal),
+        }),
+      )
     })
   })
 
@@ -223,14 +270,14 @@ describe('App', () => {
 
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText(/mensagem para o codex/i), {
-      target: { value: 'Adicionar save game.' },
-    })
+    typeInChatTextarea('Adicionar save game.')
     fireEvent.click(screen.getByRole('button', { name: /enviar mensagem/i }))
 
-    expect(await screen.findByLabelText(/mensagens do chat/i)).toHaveTextContent(
-      /posso criar um sistema de save em arquivo local como próximo passo/i,
-    )
+    await waitFor(() => {
+      expectChatValueToContain(
+        'Codex: Posso criar um sistema de save em arquivo local como próximo passo.',
+      )
+    })
   })
 
   it('shows error when the service fails', async () => {
@@ -240,12 +287,11 @@ describe('App', () => {
 
     render(<App />)
 
-    fireEvent.change(screen.getByLabelText(/mensagem para o codex/i), {
-      target: { value: 'Adicionar save game.' },
-    })
+    typeInChatTextarea('Adicionar save game.')
     fireEvent.click(screen.getByRole('button', { name: /enviar mensagem/i }))
 
-    expect(await screen.findByText(/status: error/i)).toBeInTheDocument()
-    expect(screen.getByText(/falha simulada do agente/i)).toBeInTheDocument()
+    await waitFor(() => {
+      expectChatValueToContain('Sistema: Falha simulada do agente.')
+    })
   })
 })

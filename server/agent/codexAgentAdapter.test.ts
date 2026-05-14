@@ -5,8 +5,14 @@ describe('codexAgentAdapter', () => {
     const runner = {
       run: vi.fn().mockResolvedValue('Analise o inventário antes de editar arquivos.'),
     }
+    const projectContextBuilder = {
+      build: vi.fn().mockResolvedValue(
+        ['Area prioritaria: src/game', '- src/game/components/Player.tsx'].join('\n'),
+      ),
+    }
 
     const adapter = createCodexAgentAdapter({
+      projectContextBuilder,
       runner,
       workspaceRoot: '/tmp/game',
     })
@@ -18,8 +24,13 @@ describe('codexAgentAdapter', () => {
 
     expect(runner.run).toHaveBeenCalledWith(
       expect.objectContaining({
-        executionMode: 'read-only',
+        executionMode: 'workspace-write',
         prompt: expect.stringContaining('Como devo começar o inventário?'),
+      }),
+    )
+    expect(runner.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringContaining('Area prioritaria: src/game'),
       }),
     )
     expect(response).toMatchObject({
@@ -29,24 +40,56 @@ describe('codexAgentAdapter', () => {
     })
   })
 
-  it('switches to workspace-write when the user confirms a pending implementation', async () => {
+  it('forwards the abort signal to the runner', async () => {
+    const runner = {
+      run: vi.fn().mockResolvedValue('Implementei o mapa.'),
+    }
+    const projectContextBuilder = {
+      build: vi.fn().mockResolvedValue('Area prioritaria: src/game'),
+    }
+    const abortController = new AbortController()
+    const adapter = createCodexAgentAdapter({
+      projectContextBuilder,
+      runner,
+      workspaceRoot: '/tmp/game',
+    })
+
+    await adapter.sendMessage(
+      {
+        message: 'Ajuste o mapa.',
+        conversation: [],
+      },
+      {
+        signal: abortController.signal,
+      },
+    )
+
+    expect(runner.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signal: abortController.signal,
+      }),
+    )
+  })
+
+  it('keeps workspace-write even when the user sends a plain follow-up message', async () => {
     const runner = {
       run: vi.fn().mockResolvedValue('Implementei o crafting inicial no projeto.'),
     }
+    const projectContextBuilder = {
+      build: vi.fn().mockResolvedValue('Area prioritaria: src/game'),
+    }
 
     const adapter = createCodexAgentAdapter({
+      projectContextBuilder,
       runner,
       workspaceRoot: '/tmp/game',
     })
 
     await adapter.sendMessage({
-      message: 'ok',
+      message: 'ajuste tambem o feedback visual',
       conversation: [
         { content: 'Quero crafting.' },
-        {
-          content:
-            'Posso implementar isso. Se quiser que eu implemente, responda com: sim, ok ou manda ver.',
-        },
+        { content: 'Implementei o crafting inicial no projeto.' },
       ],
     })
 
@@ -73,8 +116,11 @@ describe('codexAgentAdapter', () => {
     ).rejects.toThrow('Codex CLI indisponível.')
   })
 
-  it('marks the response as pending confirmation when the assistant asks for authorization', async () => {
+  it('does not mark the response as pending confirmation anymore', async () => {
     const adapter = createCodexAgentAdapter({
+      projectContextBuilder: {
+        build: vi.fn().mockResolvedValue('Area prioritaria: src/game'),
+      },
       runner: {
         run: vi.fn().mockResolvedValue(
           'Posso implementar isso. Se quiser que eu implemente, responda com: sim, ok ou manda ver.',
@@ -88,6 +134,6 @@ describe('codexAgentAdapter', () => {
       conversation: [],
     })
 
-    expect(response.pendingConfirmation).toBe(true)
+    expect(response.pendingConfirmation).toBe(false)
   })
 })

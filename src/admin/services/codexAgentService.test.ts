@@ -116,4 +116,42 @@ describe('codexAgentService', () => {
       }),
     ).rejects.toThrow('Prompt inválido.')
   })
+
+  it('passes the abort signal to fetch and rejects when the request is canceled', async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'))
+          })
+        }),
+    )
+
+    const service = createCodexAgentService({
+      fetchFn: fetchMock,
+    })
+    const abortController = new AbortController()
+
+    const requestPromise = service.sendMessage(
+      {
+        message: 'Adicionar crafting.',
+        conversation: [],
+      },
+      {
+        signal: abortController.signal,
+      },
+    )
+
+    abortController.abort()
+
+    await expect(requestPromise).rejects.toMatchObject({
+      name: 'AbortError',
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      CODEX_AGENT_PROMPT_ENDPOINT,
+      expect.objectContaining({
+        signal: abortController.signal,
+      }),
+    )
+  })
 })

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import { PromptConsole } from './PromptConsole'
 import { codexAgentService } from '../services/codexAgentService'
@@ -17,7 +17,7 @@ export function AdminPanel() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [status, setStatus] = useState<SubmitStatus>('idle')
   const [statusMessage, setStatusMessage] = useState('')
-  const [pendingConfirmation, setPendingConfirmation] = useState(false)
+  const activeRequestControllerRef = useRef<AbortController | null>(null)
 
   async function handleSubmit() {
     const normalizedMessage = input.trim()
@@ -37,12 +37,20 @@ export function AdminPanel() {
     setInput('')
     setStatus('submitting')
     setStatusMessage('')
+    const abortController = new AbortController()
+
+    activeRequestControllerRef.current = abortController
 
     try {
-      const response: CodexChatResponse = await codexAgentService.sendMessage({
-        message: normalizedMessage,
-        conversation,
-      })
+      const response: CodexChatResponse = await codexAgentService.sendMessage(
+        {
+          message: normalizedMessage,
+          conversation,
+        },
+        {
+          signal: abortController.signal,
+        },
+      )
 
       setMessages((currentMessages) => [
         ...currentMessages,
@@ -53,25 +61,48 @@ export function AdminPanel() {
         },
       ])
       setStatus('success')
-      setPendingConfirmation(response.pendingConfirmation)
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setStatus('idle')
+        setStatusMessage('')
+        return
+      }
+
       setStatus('error')
-      setPendingConfirmation(false)
       setStatusMessage(
         error instanceof Error ? error.message : 'Falha ao enviar mensagem.',
       )
+    } finally {
+      if (activeRequestControllerRef.current === abortController) {
+        activeRequestControllerRef.current = null
+      }
     }
   }
+
+  function handleCancel() {
+    activeRequestControllerRef.current?.abort()
+  }
+
+  const thinkingMessage: ChatMessage | null =
+    status === 'submitting'
+      ? {
+          id: 'assistant-thinking',
+          author: 'assistant',
+          content: 'Estou analisando o jogo e implementando isso agora.',
+          transient: true,
+        }
+      : null
 
   return (
     <PromptConsole
       input={input}
       messages={messages}
       onInputChange={setInput}
+      onCancel={handleCancel}
       onSubmit={handleSubmit}
-      pendingConfirmation={pendingConfirmation}
       status={status}
       statusMessage={statusMessage}
+      thinkingMessage={thinkingMessage}
     />
   )
 }
