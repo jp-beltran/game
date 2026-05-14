@@ -1,20 +1,25 @@
 export type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error'
 
-export type CodexPromptRequest = {
-  prompt: string
-  context?: {
-    currentFeature?: string
-    filesHint?: string[]
-  }
+export type CodexExecutionMode = 'read-only' | 'workspace-write'
+
+export type CodexConversationEntry = {
+  content: string
 }
 
-export type CodexPromptResponse = {
-  id: string
-  status: 'queued' | 'completed' | 'failed'
+export type CodexChatRequest = {
   message: string
+  conversation: CodexConversationEntry[]
 }
 
-export type PromptHistoryEntry = {
+export type CodexChatResponse = {
   id: string
-  prompt: string
+  status: 'completed' | 'failed'
+  message: string
+  pendingConfirmation: boolean
+}
+
+export type ChatMessage = {
+  id: string
+  content: string
+  author: 'user' | 'assistant'
 }

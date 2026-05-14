@@ -1,22 +1,52 @@
-import type { CodexPromptRequest } from '../types/admin'
+import type { CodexChatRequest } from '../types/admin'
 import {
   CODEX_AGENT_PROMPT_ENDPOINT,
   createCodexAgentService,
 } from './codexAgentService'
 
 describe('codexAgentService', () => {
-  it('returns a queued response for a submitted prompt in mock mode', async () => {
+  it('uses the local endpoint by default', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'prompt-1',
+          status: 'completed',
+          message: 'Adicionar combate básico.',
+          pendingConfirmation: false,
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      ),
+    )
+
     const service = createCodexAgentService({
-      mode: 'mock',
+      fetchFn: fetchMock,
     })
 
-    const response = await service.submitPrompt({
-      prompt: 'Adicionar combate básico.',
-    })
+    const payload: CodexChatRequest = {
+      message: 'Adicionar combate básico.',
+      conversation: [],
+    }
 
-    expect(response.id).toEqual(expect.any(String))
-    expect(response.status).toBe('queued')
-    expect(response.message).toBe('Prompt recebido pelo agente local.')
+    const response = await service.sendMessage(payload)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      CODEX_AGENT_PROMPT_ENDPOINT,
+      expect.objectContaining({
+        body: JSON.stringify(payload),
+        method: 'POST',
+      }),
+    )
+    expect(response).toMatchObject({
+      id: 'prompt-1',
+      status: 'completed',
+      message: 'Adicionar combate básico.',
+      pendingConfirmation: false,
+    })
   })
 
   it('calls the local endpoint with the expected payload in local mode', async () => {
@@ -24,11 +54,12 @@ describe('codexAgentService', () => {
       new Response(
         JSON.stringify({
           id: 'prompt-1',
-          status: 'queued',
-          message: 'Prompt recebido pelo backend local.',
+          status: 'completed',
+          message: 'Implemente um crafting simples com inventário.',
+          pendingConfirmation: true,
         }),
         {
-          status: 202,
+          status: 200,
           headers: {
             'Content-Type': 'application/json',
           },
@@ -41,15 +72,12 @@ describe('codexAgentService', () => {
       mode: 'local',
     })
 
-    const payload: CodexPromptRequest = {
-      prompt: 'Adicionar crafting.',
-      context: {
-        currentFeature: 'crafting',
-        filesHint: ['src/game/components/GameCanvas.tsx'],
-      },
+    const payload: CodexChatRequest = {
+      message: 'Adicionar crafting.',
+      conversation: [{ content: 'Mensagem anterior' }],
     }
 
-    await service.submitPrompt(payload)
+    await service.sendMessage(payload)
 
     expect(fetchMock).toHaveBeenCalledWith(
       CODEX_AGENT_PROMPT_ENDPOINT,
@@ -82,8 +110,9 @@ describe('codexAgentService', () => {
     })
 
     await expect(
-      service.submitPrompt({
-        prompt: '',
+      service.sendMessage({
+        message: '',
+        conversation: [],
       }),
     ).rejects.toThrow('Prompt inválido.')
   })

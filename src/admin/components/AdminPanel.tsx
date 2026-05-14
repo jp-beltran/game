@@ -1,70 +1,77 @@
 import { useState } from 'react'
 
-import { Modal } from '../../shared/components/Modal'
 import { PromptConsole } from './PromptConsole'
 import { codexAgentService } from '../services/codexAgentService'
 import type {
-  CodexPromptResponse,
-  PromptHistoryEntry,
+  ChatMessage,
+  CodexChatResponse,
   SubmitStatus,
 } from '../types/admin'
 
-type AdminPanelProps = {
-  isOpen: boolean
-  onClose: () => void
+function createMessageId(prefix: ChatMessage['author']) {
+  return globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now()}`
 }
 
-export function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
-  const [prompt, setPrompt] = useState('')
-  const [history, setHistory] = useState<PromptHistoryEntry[]>([])
+export function AdminPanel() {
+  const [input, setInput] = useState('')
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [status, setStatus] = useState<SubmitStatus>('idle')
   const [statusMessage, setStatusMessage] = useState('')
+  const [pendingConfirmation, setPendingConfirmation] = useState(false)
 
   async function handleSubmit() {
-    const normalizedPrompt = prompt.trim()
+    const normalizedMessage = input.trim()
 
-    if (!normalizedPrompt) {
+    if (!normalizedMessage) {
       return
     }
 
+    const conversation = messages.map(({ content }) => ({ content }))
+    const userMessage: ChatMessage = {
+      id: createMessageId('user'),
+      author: 'user',
+      content: normalizedMessage,
+    }
+
+    setMessages((currentMessages) => [...currentMessages, userMessage])
+    setInput('')
     setStatus('submitting')
     setStatusMessage('')
 
     try {
-      const response: CodexPromptResponse = await codexAgentService.submitPrompt({
-        prompt: normalizedPrompt,
+      const response: CodexChatResponse = await codexAgentService.sendMessage({
+        message: normalizedMessage,
+        conversation,
       })
 
-      setHistory((currentHistory) => [
-        { id: response.id, prompt: normalizedPrompt },
-        ...currentHistory,
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        {
+          id: response.id,
+          author: 'assistant',
+          content: response.message,
+        },
       ])
       setStatus('success')
-      setStatusMessage(response.message)
-      setPrompt('')
+      setPendingConfirmation(response.pendingConfirmation)
     } catch (error) {
       setStatus('error')
+      setPendingConfirmation(false)
       setStatusMessage(
-        error instanceof Error ? error.message : 'Falha ao enviar prompt.',
+        error instanceof Error ? error.message : 'Falha ao enviar mensagem.',
       )
     }
   }
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Admin Panel"
-      titleId="admin-panel-title"
-    >
-      <PromptConsole
-        history={history}
-        onPromptChange={setPrompt}
-        onSubmit={handleSubmit}
-        prompt={prompt}
-        status={status}
-        statusMessage={statusMessage}
-      />
-    </Modal>
+    <PromptConsole
+      input={input}
+      messages={messages}
+      onInputChange={setInput}
+      onSubmit={handleSubmit}
+      pendingConfirmation={pendingConfirmation}
+      status={status}
+      statusMessage={statusMessage}
+    />
   )
 }

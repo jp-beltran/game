@@ -1,60 +1,82 @@
 import { Button } from '../../shared/components/Button'
-import type { PromptHistoryEntry, SubmitStatus } from '../types/admin'
+import type { ChatMessage, SubmitStatus } from '../types/admin'
 
 type PromptConsoleProps = {
-  prompt: string
-  history: PromptHistoryEntry[]
+  input: string
+  messages: ChatMessage[]
   status: SubmitStatus
   statusMessage: string
-  onPromptChange: (value: string) => void
+  pendingConfirmation: boolean
+  onInputChange: (value: string) => void
   onSubmit: () => void
 }
 
 export function PromptConsole({
-  prompt,
-  history,
+  input,
+  messages,
   status,
   statusMessage,
-  onPromptChange,
+  pendingConfirmation,
+  onInputChange,
   onSubmit,
 }: PromptConsoleProps) {
-  const isSubmitDisabled = prompt.trim().length === 0 || status === 'submitting'
+  const isSubmitDisabled = input.trim().length === 0 || status === 'submitting'
 
   return (
-    <div className="prompt-console">
-      <label className="prompt-label" htmlFor="admin-prompt">
-        Prompt de desenvolvimento
-      </label>
-      <textarea
-        className="prompt-textarea"
-        id="admin-prompt"
-        onChange={(event) => onPromptChange(event.target.value)}
-        placeholder="Descreva a próxima evolução do jogo."
-        rows={6}
-        value={prompt}
-      />
-
-      <div className="prompt-actions">
-        <Button disabled={isSubmitDisabled} onClick={onSubmit}>
-          Enviar prompt
-        </Button>
+    <section aria-label="Codex Chat" className="floating-chat">
+      <div className="floating-chat-header">
+        <div>
+          <p className="floating-chat-eyebrow">Codex</p>
+          <h2>Chat do jogo</h2>
+        </div>
         <p className="prompt-status">Status: {status}</p>
       </div>
 
-      {statusMessage ? <p className="prompt-message">{statusMessage}</p> : null}
-
-      <section aria-label="Histórico de prompts" className="prompt-history">
-        <h3>Prompts enviados</h3>
-        {history.length > 0 ? (
-          <ul>
-            {history.map((entry) => (
-              <li key={entry.id}>{entry.prompt}</li>
-            ))}
-          </ul>
+      <section aria-label="Mensagens do chat" className="chat-messages">
+        {messages.length > 0 ? (
+          messages.map((message) => (
+            <article
+              className={`chat-bubble chat-bubble-${message.author}`}
+              key={message.id}
+            >
+              <p className="chat-author">
+                {message.author === 'user' ? 'Você' : 'Codex'}
+              </p>
+              <p>{message.content}</p>
+            </article>
+          ))
         ) : (
-          <p>Nenhum prompt enviado ainda.</p>
+          <p className="chat-empty">
+            Descreva a próxima evolução do jogo e o Codex responde aqui.
+          </p>
         )}
       </section>
-    </div>
+
+      <div className="chat-composer">
+        <label className="prompt-label" htmlFor="admin-prompt">
+          Mensagem para o Codex
+        </label>
+        <textarea
+          className="prompt-textarea"
+          id="admin-prompt"
+          onChange={(event) => onInputChange(event.target.value)}
+          placeholder="Ex.: adicionar inventário, melhorar HUD, revisar save."
+          rows={4}
+          value={input}
+        />
+
+        <div className="prompt-actions">
+          <Button disabled={isSubmitDisabled} onClick={onSubmit}>
+            Enviar mensagem
+          </Button>
+          {pendingConfirmation ? (
+            <p className="prompt-message">
+              Há uma implementação pendente de confirmação.
+            </p>
+          ) : null}
+        </div>
+        {statusMessage ? <p className="prompt-message">{statusMessage}</p> : null}
+      </div>
+    </section>
   )
 }

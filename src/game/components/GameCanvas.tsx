@@ -1,3 +1,4 @@
+import type { PropsWithChildren } from 'react'
 import { Canvas } from '@react-three/fiber'
 
 import { usePlayerController } from '../hooks/usePlayerController'
@@ -5,7 +6,7 @@ import { World } from './World'
 
 const SHOW_PLAYER_DEBUG = import.meta.env.DEV || import.meta.env.MODE === 'test'
 
-export function GameCanvas() {
+export function GameCanvas({ children }: PropsWithChildren) {
   const controller = usePlayerController()
 
   return (
@@ -26,6 +27,7 @@ export function GameCanvas() {
           {' '}z: {controller.position.z.toFixed(2)}
         </div>
       ) : null}
+      {children}
     </section>
   )
 }

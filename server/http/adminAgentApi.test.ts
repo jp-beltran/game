@@ -12,10 +12,11 @@ describe('admin agent API', () => {
     const server = createServer(
       createAdminAgentApiHandler({
         adapter: {
-          submitPrompt: vi.fn().mockResolvedValue({
+          sendMessage: vi.fn().mockResolvedValue({
             id: 'prompt-1',
-            status: 'queued',
-            message: 'Prompt recebido pelo backend local.',
+            status: 'completed',
+            message: 'Resposta final do agente.',
+            pendingConfirmation: false,
           }),
         },
       }),
@@ -52,7 +53,8 @@ describe('admin agent API', () => {
     await withTestServer(async (baseUrl) => {
       const response = await fetch(`${baseUrl}/api/admin/agent/prompts`, {
         body: JSON.stringify({
-          prompt: '   ',
+          message: '   ',
+          conversation: [],
         }),
         headers: {
           'Content-Type': 'application/json',
@@ -62,20 +64,17 @@ describe('admin agent API', () => {
 
       expect(response.status).toBe(400)
       await expect(response.json()).resolves.toMatchObject({
-        message: expect.stringMatching(/prompt/i),
+        message: expect.stringMatching(/prompt|mensagem/i),
       })
     })
   })
 
-  it('accepts a valid prompt payload', async () => {
+  it('accepts a valid chat payload', async () => {
     await withTestServer(async (baseUrl) => {
       const response = await fetch(`${baseUrl}/api/admin/agent/prompts`, {
         body: JSON.stringify({
-          prompt: 'Adicionar sistema de missões.',
-          context: {
-            currentFeature: 'quests',
-            filesHint: ['src/app/App.tsx'],
-          },
+          message: 'Adicionar sistema de missões.',
+          conversation: [{ content: 'Mensagem anterior' }],
         }),
         headers: {
           'Content-Type': 'application/json',
@@ -83,15 +82,16 @@ describe('admin agent API', () => {
         method: 'POST',
       })
 
-      expect(response.status).toBe(202)
+      expect(response.status).toBe(200)
     })
   })
 
-  it('returns queued for a valid prompt', async () => {
+  it('returns completed for a valid message', async () => {
     await withTestServer(async (baseUrl) => {
       const response = await fetch(`${baseUrl}/api/admin/agent/prompts`, {
         body: JSON.stringify({
-          prompt: 'Adicionar sistema de inventário.',
+          message: 'Adicionar sistema de inventário.',
+          conversation: [],
         }),
         headers: {
           'Content-Type': 'application/json',
@@ -101,8 +101,9 @@ describe('admin agent API', () => {
 
       await expect(response.json()).resolves.toMatchObject({
         id: expect.any(String),
-        message: 'Prompt recebido pelo backend local.',
-        status: 'queued',
+        message: 'Resposta final do agente.',
+        pendingConfirmation: false,
+        status: 'completed',
       })
     })
   })
@@ -111,7 +112,8 @@ describe('admin agent API', () => {
     await withTestServer(async (baseUrl) => {
       const response = await fetch(`${baseUrl}/api/admin/agent/prompts`, {
         body: JSON.stringify({
-          prompt: 'x'.repeat(CODEX_AGENT_MAX_PROMPT_LENGTH + 1),
+          message: 'x'.repeat(CODEX_AGENT_MAX_PROMPT_LENGTH + 1),
+          conversation: [],
         }),
         headers: {
           'Content-Type': 'application/json',
@@ -122,6 +124,26 @@ describe('admin agent API', () => {
       expect(response.status).toBe(400)
       await expect(response.json()).resolves.toMatchObject({
         message: expect.stringMatching(/limite|tamanho/i),
+      })
+    })
+  })
+
+  it('rejects an invalid conversation payload', async () => {
+    await withTestServer(async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/admin/agent/prompts`, {
+        body: JSON.stringify({
+          message: 'Adicionar mapa.',
+          conversation: [{ content: '' }],
+        }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        method: 'POST',
+      })
+
+      expect(response.status).toBe(400)
+      await expect(response.json()).resolves.toMatchObject({
+        message: expect.stringMatching(/conversa|conversation|histórico/i),
       })
     })
   })

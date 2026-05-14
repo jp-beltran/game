@@ -5,7 +5,7 @@ import {
   CODEX_AGENT_MAX_PROMPT_LENGTH,
   CODEX_AGENT_PROMPT_ENDPOINT,
 } from '../../src/admin/config/codexAgent'
-import type { CodexPromptRequest } from '../../src/admin/types/admin'
+import type { CodexChatRequest } from '../../src/admin/types/admin'
 
 type NextFunction = () => void
 
@@ -20,16 +20,14 @@ type ErrorBody = {
 function sendJson(
   response: ServerResponse,
   statusCode: number,
-  payload: ErrorBody | Awaited<ReturnType<CodexAgentAdapter['submitPrompt']>>,
+  payload: ErrorBody | Awaited<ReturnType<CodexAgentAdapter['sendMessage']>>,
 ) {
   response.statusCode = statusCode
   response.setHeader('Content-Type', 'application/json; charset=utf-8')
   response.end(JSON.stringify(payload))
 }
 
-async function readJsonBody(
-  request: IncomingMessage,
-): Promise<unknown> {
+async function readJsonBody(request: IncomingMessage): Promise<unknown> {
   const chunks: Uint8Array[] = []
 
   for await (const chunk of request) {
@@ -45,57 +43,49 @@ async function readJsonBody(
   return JSON.parse(body) as unknown
 }
 
-function isValidContext(context: unknown): boolean {
-  if (context === undefined) {
-    return true
-  }
-
-  if (!context || typeof context !== 'object' || Array.isArray(context)) {
+function isValidConversation(conversation: unknown): boolean {
+  if (!Array.isArray(conversation)) {
     return false
   }
 
-  const typedContext = context as CodexPromptRequest['context']
+  return conversation.every((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      return false
+    }
 
-  if (
-    typedContext?.currentFeature !== undefined &&
-    typeof typedContext.currentFeature !== 'string'
-  ) {
-    return false
-  }
+    const typedEntry = entry as CodexChatRequest['conversation'][number]
 
-  if (typedContext?.filesHint === undefined) {
-    return true
-  }
-
-  return typedContext.filesHint.every(
-    (fileHint) => typeof fileHint === 'string' && fileHint.trim().length > 0,
-  )
+    return (
+      typeof typedEntry.content === 'string' &&
+      typedEntry.content.trim().length > 0
+    )
+  })
 }
 
-function validatePromptRequest(payload: unknown): ErrorBody | null {
+function validateChatRequest(payload: unknown): ErrorBody | null {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return {
-      message: 'Payload inválido para envio do prompt.',
+      message: 'Payload inválido para envio da mensagem.',
     }
   }
 
-  const request = payload as CodexPromptRequest
+  const request = payload as CodexChatRequest
 
-  if (typeof request.prompt !== 'string' || request.prompt.trim().length === 0) {
+  if (typeof request.message !== 'string' || request.message.trim().length === 0) {
     return {
-      message: 'Prompt obrigatório e não pode estar vazio.',
+      message: 'Mensagem obrigatória e não pode estar vazia.',
     }
   }
 
-  if (request.prompt.length > CODEX_AGENT_MAX_PROMPT_LENGTH) {
+  if (request.message.length > CODEX_AGENT_MAX_PROMPT_LENGTH) {
     return {
-      message: `Prompt excede o limite de ${CODEX_AGENT_MAX_PROMPT_LENGTH} caracteres.`,
+      message: `Mensagem excede o limite de ${CODEX_AGENT_MAX_PROMPT_LENGTH} caracteres.`,
     }
   }
 
-  if (!isValidContext(request.context)) {
+  if (!isValidConversation(request.conversation)) {
     return {
-      message: 'Contexto inválido para envio do prompt.',
+      message: 'Histórico da conversa inválido para envio da mensagem.',
     }
   }
 
@@ -126,18 +116,21 @@ export function createAdminAgentApiHandler({
 
     try {
       const body = await readJsonBody(request)
-      const validationError = validatePromptRequest(body)
+      const validationError = validateChatRequest(body)
 
       if (validationError) {
         sendJson(response, 400, validationError)
         return
       }
 
-      const result = await adapter.submitPrompt(body as CodexPromptRequest)
-      sendJson(response, 202, result)
-    } catch (_error) {
-      sendJson(response, 400, {
-        message: 'Não foi possível processar o payload do prompt.',
+      const result = await adapter.sendMessage(body as CodexChatRequest)
+      sendJson(response, 200, result)
+    } catch (error) {
+      sendJson(response, 500, {
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Falha ao executar o Codex CLI local.',
       })
     }
   }
