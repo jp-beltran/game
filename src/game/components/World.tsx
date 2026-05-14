@@ -1,162 +1,109 @@
 import { Player } from './Player'
 import { ThirdPersonCamera } from './ThirdPersonCamera'
-import type { DirectionInput, Position3D } from '../types/game'
+import {
+  HEX_TILE_HEIGHT,
+  HEX_TILE_RADIUS,
+  hexToWorldPosition,
+} from '../engine/movement'
+import type { HexCoordinate, PlayerMotion, Position3D } from '../types/game'
 
 type WorldProps = {
-  playerDirection: DirectionInput
+  playerMotion: PlayerMotion
   playerPosition: Position3D
   onPlayerFrame: (delta: number) => void
 }
 
-function House({
-  baseColor,
-  position,
-  roofColor,
-  name,
-}: {
-  baseColor: string
-  name?: string
-  position: [number, number, number]
-  roofColor: string
-}) {
-  return (
-    <group name={name} position={position}>
-      <mesh castShadow position={[0, 0.9, 0]}>
-        <boxGeometry args={[1.9, 1.8, 1.7]} />
-        <meshStandardMaterial color={baseColor} roughness={0.96} />
-      </mesh>
-      <mesh castShadow position={[0, 2.05, 0]} rotation={[0, Math.PI / 4, 0]}>
-        <coneGeometry args={[1.5, 1.2, 4]} />
-        <meshStandardMaterial color={roofColor} roughness={0.92} />
-      </mesh>
-      <mesh castShadow position={[0.72, 0.72, 0.86]}>
-        <boxGeometry args={[0.38, 0.82, 0.08]} />
-        <meshStandardMaterial color="#5c4737" roughness={0.94} />
-      </mesh>
-    </group>
-  )
+type HexBiome = {
+  color: string
+  key: string
 }
 
-function BorderWall({
-  name,
-  position,
-  size,
-}: {
-  name?: string
-  position: [number, number, number]
-  size: [number, number, number]
-}) {
-  return (
-    <mesh castShadow name={name} position={position} receiveShadow>
-      <boxGeometry args={size} />
-      <meshStandardMaterial color="#948e89" roughness={0.96} />
-    </mesh>
-  )
+type HexTile = {
+  biome: HexBiome
+  coordinate: HexCoordinate
 }
 
-function Fence({
-  position,
-  rotation = [0, 0, 0],
-}: {
-  position: [number, number, number]
-  rotation?: [number, number, number]
-}) {
-  return (
-    <group position={position} rotation={rotation}>
-      <mesh castShadow position={[-0.45, 0.34, 0]}>
-        <boxGeometry args={[0.12, 0.68, 0.12]} />
-        <meshStandardMaterial color="#6b5b4f" roughness={0.96} />
-      </mesh>
-      <mesh castShadow position={[0.45, 0.34, 0]}>
-        <boxGeometry args={[0.12, 0.68, 0.12]} />
-        <meshStandardMaterial color="#6b5b4f" roughness={0.96} />
-      </mesh>
-      <mesh castShadow position={[0, 0.46, 0]}>
-        <boxGeometry args={[1.05, 0.1, 0.08]} />
-        <meshStandardMaterial color="#776657" roughness={0.98} />
-      </mesh>
-      <mesh castShadow position={[0, 0.22, 0]}>
-        <boxGeometry args={[1.05, 0.1, 0.08]} />
-        <meshStandardMaterial color="#776657" roughness={0.98} />
-      </mesh>
-    </group>
-  )
+const MAP_RADIUS = 4
+
+const BIOMES: HexBiome[] = [
+  { color: '#8f7650', key: 'badlands' },
+  { color: '#6e7350', key: 'brush' },
+  { color: '#b19a66', key: 'dunes' },
+  { color: '#78644a', key: 'highlands' },
+]
+
+function resolveBiome(coordinate: HexCoordinate) {
+  const index =
+    Math.abs(coordinate.q * 17 + coordinate.r * 11 + (coordinate.q + coordinate.r) * 5) %
+    BIOMES.length
+
+  return BIOMES[index]
 }
 
-export function World({ playerDirection, playerPosition, onPlayerFrame }: WorldProps) {
+function createHexMap(radius: number): HexTile[] {
+  const tiles: HexTile[] = []
+
+  for (let q = -radius; q <= radius; q += 1) {
+    const minR = Math.max(-radius, -q - radius)
+    const maxR = Math.min(radius, -q + radius)
+
+    for (let r = minR; r <= maxR; r += 1) {
+      const coordinate = { q, r }
+
+      tiles.push({
+        biome: resolveBiome(coordinate),
+        coordinate,
+      })
+    }
+  }
+
+  return tiles
+}
+
+const HEX_MAP = createHexMap(MAP_RADIUS)
+
+export function World({ playerMotion, playerPosition, onPlayerFrame }: WorldProps) {
   return (
     <>
-      <color attach="background" args={['#7ba4b8']} />
-      <fog attach="fog" args={['#7ba4b8', 10, 26]} />
-      <ambientLight intensity={0.88} color="#f4ead7" />
-      <hemisphereLight args={['#dfeaf0', '#7b735f', 0.58]} />
+      <color attach="background" args={['#9fb4b2']} />
+      <fog attach="fog" args={['#9fb4b2', 12, 28]} />
+      <ambientLight intensity={0.92} color="#f3ead4" />
+      <hemisphereLight args={['#d9e8e2', '#75664d', 0.62]} />
       <directionalLight
         castShadow
         color="#fff5de"
-        intensity={1.55}
-        position={[8, 12, 6]}
+        intensity={1.45}
+        position={[9, 13, 8]}
         shadow-mapSize-height={2048}
         shadow-mapSize-width={2048}
       />
 
-      <mesh position={[0, -0.95, 0]} receiveShadow>
-        <cylinderGeometry args={[8.8, 9.4, 1.2, 24]} />
-        <meshStandardMaterial color="#7e8661" roughness={0.98} />
-      </mesh>
+      {HEX_MAP.map(({ biome, coordinate }) => {
+        const position = hexToWorldPosition(coordinate)
 
-      <mesh
-        name="world-plaza"
-        position={[0, -0.24, 0]}
-        receiveShadow
-        rotation={[-Math.PI / 2, 0, 0]}
-      >
-        <circleGeometry args={[4.8, 24]} />
-        <meshStandardMaterial color="#8a9a5b" roughness={1} />
-      </mesh>
+        return (
+          <mesh
+            castShadow
+            data-biome={biome.key}
+            key={`${coordinate.q}:${coordinate.r}`}
+            name={`hex-tile-${coordinate.q}-${coordinate.r}`}
+            position={[position.x, -HEX_TILE_HEIGHT / 2, position.z]}
+            receiveShadow
+          >
+            <cylinderGeometry
+              args={[HEX_TILE_RADIUS, HEX_TILE_RADIUS * 1.04, HEX_TILE_HEIGHT, 6]}
+            />
+            <meshStandardMaterial color={biome.color} roughness={0.94} />
+          </mesh>
+        )
+      })}
 
-      <mesh position={[0, -0.18, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[4.6, 6.8, 24]} />
-        <meshStandardMaterial color="#76814f" roughness={1} />
-      </mesh>
-
-      <BorderWall position={[0, -0.18, -5.2]} size={[9.4, 0.72, 0.82]} name="world-border-north" />
-      <BorderWall position={[0, -0.18, 5.2]} size={[9.4, 0.72, 0.82]} />
-      <BorderWall position={[-5.2, -0.18, 0]} size={[0.82, 0.72, 9.4]} />
-      <BorderWall position={[5.2, -0.18, 0]} size={[0.82, 0.72, 9.4]} />
-
-      <House
-        baseColor="#948e89"
-        name="world-house-west"
-        position={[-3.25, -0.12, -2.9]}
-        roofColor="#6b5b4f"
+      <Player
+        facingAngle={playerMotion.facingAngle}
+        isMoving={playerMotion.isMoving}
+        onFrame={onPlayerFrame}
+        position={playerPosition}
       />
-      <House
-        baseColor="#8f897e"
-        position={[3.35, -0.12, -2.35]}
-        roofColor="#786354"
-      />
-      <House
-        baseColor="#a09588"
-        position={[2.85, -0.12, 3.1]}
-        roofColor="#65564b"
-      />
-
-      <Fence position={[-1.7, -0.24, 4.45]} />
-      <Fence position={[0, -0.24, 4.45]} />
-      <Fence position={[1.7, -0.24, 4.45]} />
-      <Fence position={[-4.2, -0.24, 1.2]} rotation={[0, Math.PI / 2, 0]} />
-      <Fence position={[4.2, -0.24, 1.8]} rotation={[0, Math.PI / 2, 0]} />
-
-      <mesh castShadow position={[-0.6, -0.02, -0.8]}>
-        <cylinderGeometry args={[0.42, 0.56, 0.44, 8]} />
-        <meshStandardMaterial color="#857b6d" roughness={0.96} />
-      </mesh>
-      <mesh castShadow position={[-0.6, 0.42, -0.8]}>
-        <boxGeometry args={[0.16, 0.58, 0.16]} />
-        <meshStandardMaterial color="#6a5848" roughness={0.94} />
-      </mesh>
-
-      <Player direction={playerDirection} onFrame={onPlayerFrame} position={playerPosition} />
       <ThirdPersonCamera target={playerPosition} />
     </>
   )

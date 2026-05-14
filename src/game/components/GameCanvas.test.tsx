@@ -37,12 +37,12 @@ describe('GameCanvas', () => {
     expect(container.querySelector('group[name="player-model-idle"]')).toBeInTheDocument()
   })
 
-  it('renders the diorama landmarks around the player', () => {
+  it('renders a hex-tile world around the player', () => {
     const { container } = render(<GameCanvas />)
 
-    expect(container.querySelector('mesh[name="world-plaza"]')).toBeInTheDocument()
-    expect(container.querySelector('group[name="world-house-west"]')).toBeInTheDocument()
-    expect(container.querySelector('mesh[name="world-border-north"]')).toBeInTheDocument()
+    expect(container.querySelector('mesh[name="hex-tile-0-0"]')).toBeInTheDocument()
+    expect(container.querySelector('mesh[name="hex-tile-1--1"]')).toBeInTheDocument()
+    expect(container.querySelectorAll('mesh[data-biome]').length).toBeGreaterThan(12)
   })
 
   it('shows the player position debug in test environment', () => {

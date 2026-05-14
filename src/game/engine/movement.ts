@@ -1,28 +1,47 @@
-import type { DirectionInput, Position3D } from '../types/game'
+import type {
+  GridMoveDirection,
+  HexCoordinate,
+  Position3D,
+} from '../types/game'
 
-function resolveAxis(negativeDirection: boolean, positiveDirection: boolean) {
-  return Number(positiveDirection) - Number(negativeDirection)
+export const HEX_TILE_RADIUS = 0.9
+export const HEX_TILE_HEIGHT = 0.84
+
+const HEX_DIRECTION_VECTORS: Record<GridMoveDirection, HexCoordinate> = {
+  forward: { q: 0, r: -1 },
+  backward: { q: 0, r: 1 },
+  left: { q: -1, r: 0 },
+  right: { q: 1, r: 0 },
 }
 
-export function calculateNextPosition(
-  currentPosition: Position3D,
-  input: DirectionInput,
-  delta: number,
-  speed: number,
-): Position3D {
-  const horizontal = resolveAxis(input.left, input.right)
-  const depth = resolveAxis(input.forward, input.backward)
-
-  if (horizontal === 0 && depth === 0) {
-    return { ...currentPosition }
-  }
-
-  const magnitude = Math.hypot(horizontal, depth)
-  const distance = delta * speed
+export function getAdjacentHexCoordinate(
+  currentCoordinate: HexCoordinate,
+  direction: GridMoveDirection,
+): HexCoordinate {
+  const offset = HEX_DIRECTION_VECTORS[direction]
 
   return {
-    x: currentPosition.x + (horizontal / magnitude) * distance,
-    y: currentPosition.y,
-    z: currentPosition.z + (depth / magnitude) * distance,
+    q: currentCoordinate.q + offset.q,
+    r: currentCoordinate.r + offset.r,
+  }
+}
+
+export function hexToWorldPosition(coordinate: HexCoordinate): Position3D {
+  return {
+    x: HEX_TILE_RADIUS * Math.sqrt(3) * (coordinate.q + coordinate.r / 2),
+    y: 0,
+    z: HEX_TILE_RADIUS * 1.5 * coordinate.r,
+  }
+}
+
+export function interpolatePosition(
+  start: Position3D,
+  end: Position3D,
+  progress: number,
+): Position3D {
+  return {
+    x: start.x + (end.x - start.x) * progress,
+    y: start.y + (end.y - start.y) * progress,
+    z: start.z + (end.z - start.z) * progress,
   }
 }

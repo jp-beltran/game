@@ -10,7 +10,8 @@ describe('Player', () => {
   it('renders a minimalist knight silhouette instead of a single capsule', () => {
     const { container } = render(
       <Player
-        direction={{ forward: false, backward: false, left: false, right: false }}
+        facingAngle={0}
+        isMoving={false}
         position={{ x: 0, y: 0, z: 0 }}
         onFrame={vi.fn()}
       />,
@@ -28,7 +29,8 @@ describe('Player', () => {
   it('uses a muted steel palette for the main armor pieces', () => {
     const { container } = render(
       <Player
-        direction={{ forward: false, backward: false, left: false, right: false }}
+        facingAngle={0}
+        isMoving={false}
         position={{ x: 0, y: 0, z: 0 }}
         onFrame={vi.fn()}
       />,
@@ -42,7 +44,8 @@ describe('Player', () => {
   it('marks the player as idle when there is no movement input', () => {
     const { container } = render(
       <Player
-        direction={{ forward: false, backward: false, left: false, right: false }}
+        facingAngle={0}
+        isMoving={false}
         position={{ x: 0, y: 0, z: 0 }}
         onFrame={vi.fn()}
       />,
@@ -54,7 +57,8 @@ describe('Player', () => {
   it('marks the player as walking when there is movement input', () => {
     const { container } = render(
       <Player
-        direction={{ forward: true, backward: false, left: false, right: true }}
+        facingAngle={Math.PI / 3}
+        isMoving
         position={{ x: 0, y: 0, z: 0 }}
         onFrame={vi.fn()}
       />,
@@ -66,6 +70,8 @@ describe('Player', () => {
   it('falls back to idle when direction is omitted', () => {
     const { container } = render(
       <Player
+        facingAngle={0}
+        isMoving={false}
         position={{ x: 0, y: 0, z: 0 }}
         onFrame={vi.fn()}
       />,

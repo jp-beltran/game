@@ -2,11 +2,11 @@ import { useFrame, useThree } from '@react-three/fiber'
 
 import type { Position3D } from '../types/game'
 
-const CAMERA_HEIGHT = 7.2
-const CAMERA_DISTANCE = 6.4
-const CAMERA_SIDE_OFFSET = 5.8
+const CAMERA_HEIGHT = 9.4
+const CAMERA_DISTANCE = 6.8
+const CAMERA_SIDE_OFFSET = 6.8
 const CAMERA_LOOK_HEIGHT = 0.9
-const CAMERA_FOLLOW_SPEED = 4.5
+const CAMERA_FOLLOW_SPEED = 6
 
 function lerp(start: number, end: number, alpha: number) {
   return start + (end - start) * alpha

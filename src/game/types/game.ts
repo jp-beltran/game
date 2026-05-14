@@ -10,3 +10,15 @@ export type DirectionInput = {
   left: boolean
   right: boolean
 }
+
+export type GridMoveDirection = keyof DirectionInput
+
+export type HexCoordinate = {
+  q: number
+  r: number
+}
+
+export type PlayerMotion = {
+  facingAngle: number
+  isMoving: boolean
+}

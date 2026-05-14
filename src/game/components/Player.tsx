@@ -1,10 +1,11 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 
-import type { DirectionInput, Position3D } from '../types/game'
+import type { Position3D } from '../types/game'
 
 type PlayerProps = {
-  direction?: DirectionInput
+  facingAngle: number
+  isMoving: boolean
   position: Position3D
   onFrame: (delta: number) => void
 }
@@ -26,13 +27,6 @@ type AnimatedNode = {
   rotation: RotationAxis
 }
 
-const IDLE_DIRECTION: DirectionInput = {
-  forward: false,
-  backward: false,
-  left: false,
-  right: false,
-}
-
 function normalizeAngle(angle: number) {
   let normalized = angle
 
@@ -47,20 +41,9 @@ function normalizeAngle(angle: number) {
   return normalized
 }
 
-function resolveMovement(direction: DirectionInput = IDLE_DIRECTION) {
-  const x = Number(direction.right) - Number(direction.left)
-  const z = Number(direction.backward) - Number(direction.forward)
-  const isMoving = x !== 0 || z !== 0
-
-  return {
-    x,
-    z,
-    isMoving,
-  }
-}
-
 export function Player({
-  direction = IDLE_DIRECTION,
+  facingAngle,
+  isMoving,
   position,
   onFrame,
 }: PlayerProps) {
@@ -77,7 +60,6 @@ export function Player({
   useFrame((state, delta) => {
     onFrame(delta)
 
-    const movement = resolveMovement(direction)
     const elapsed = state.clock.getElapsedTime()
     const root = rootRef.current
     const body = bodyRef.current
@@ -103,13 +85,13 @@ export function Player({
       return
     }
 
-    if (movement.isMoving) {
-      const targetRotation = Math.atan2(movement.x, movement.z)
-      const rotationDelta = normalizeAngle(targetRotation - root.rotation.y)
+    const rotationDelta = normalizeAngle(facingAngle - root.rotation.y)
+
+    if (Math.abs(rotationDelta) > 0.001) {
       root.rotation.y += rotationDelta * Math.min(1, delta * 10)
     }
 
-    if (movement.isMoving) {
+    if (isMoving) {
       const walkCycle = elapsed * 10
       const armSwing = Math.sin(walkCycle) * 0.55
       const legSwing = Math.sin(walkCycle) * 0.65
@@ -139,8 +121,6 @@ export function Player({
       shield.rotation.z = 0.18 + idleSway * 0.12
     }
   })
-
-  const { isMoving } = resolveMovement(direction)
 
   return (
     <group

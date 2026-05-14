@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react'
 import { getDirectionFromKey, updateDirectionInput } from './input'
 import { useKeyboardMovement } from '../hooks/useKeyboardMovement'
 import { usePlayerController } from '../hooks/usePlayerController'
+import { hexToWorldPosition } from './movement'
 import type { DirectionInput } from '../types/game'
 
 function createInput(overrides: Partial<DirectionInput> = {}): DirectionInput {
@@ -139,30 +140,66 @@ describe('useKeyboardMovement', () => {
 })
 
 describe('usePlayerController', () => {
-  it('keeps the initial position and exposes input', () => {
+  it('keeps the initial hex position and exposes idle motion state', () => {
     const { result } = renderHook(() =>
       usePlayerController({
-        initialPosition: { x: 1, y: 2, z: 3 },
-        speed: 6,
+        initialHex: { q: 1, r: -1 },
+        stepDuration: 0.2,
       }),
     )
 
-    expect(result.current.position).toEqual({ x: 1, y: 2, z: 3 })
+    expect(result.current.hex).toEqual({ q: 1, r: -1 })
+    expect(result.current.position).toEqual(hexToWorldPosition({ q: 1, r: -1 }))
     expect(result.current.input).toEqual(createInput())
+    expect(result.current.motion).toEqual({
+      facingAngle: 0,
+      isMoving: false,
+    })
   })
 
-  it('advances the player position using keyboard input and delta', () => {
-    const { result } = renderHook(() => usePlayerController())
+  it('moves exactly one hex per key press with a smooth in-between transition', () => {
+    const { result } = renderHook(() => usePlayerController({ stepDuration: 0.2 }))
+    const firstTarget = hexToWorldPosition({ q: 0, r: -1 })
 
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w' }))
     })
 
     act(() => {
-      result.current.update(0.5)
+      result.current.update(0.1)
     })
 
     expect(result.current.input).toEqual(createInput({ forward: true }))
-    expect(result.current.position).toEqual({ x: 0, y: 0, z: -2 })
+    expect(result.current.motion.isMoving).toBe(true)
+    expect(result.current.position).not.toEqual({ x: 0, y: 0, z: 0 })
+    expect(result.current.position).not.toEqual(firstTarget)
+
+    act(() => {
+      result.current.update(0.1)
+    })
+
+    expect(result.current.hex).toEqual({ q: 0, r: -1 })
+    expect(result.current.position).toEqual(firstTarget)
+    expect(result.current.motion.isMoving).toBe(false)
+
+    act(() => {
+      result.current.update(0.3)
+    })
+
+    expect(result.current.hex).toEqual({ q: 0, r: -1 })
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: 'w' }))
+    })
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w' }))
+    })
+
+    act(() => {
+      result.current.update(0.2)
+    })
+
+    expect(result.current.hex).toEqual({ q: 0, r: -2 })
   })
 })

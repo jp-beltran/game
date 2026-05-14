@@ -17,7 +17,7 @@ export function GameCanvas({ children }: PropsWithChildren) {
     >
       <Canvas camera={{ position: [5.8, 7.2, 6.4], fov: 42 }} shadows>
         <World
-          playerDirection={controller.input}
+          playerMotion={controller.motion}
           onPlayerFrame={controller.update}
           playerPosition={controller.position}
         />
