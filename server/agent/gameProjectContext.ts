@@ -117,6 +117,30 @@ const PRIORITY_FILES: PriorityFileDefinition[] = [
 
 const SEARCH_ROOTS = ['src', 'server']
 const CODE_EXTENSIONS = new Set(['.ts', '.tsx'])
+const PUBLIC_ASSET_EXTENSIONS = new Set(['.glb', '.gltf', '.fbx', '.obj', '.blend'])
+const PUBLIC_ASSET_TOKEN_HINTS = new Set([
+  'animacao',
+  'animacoes',
+  'animation',
+  'animations',
+  'arma',
+  'armas',
+  'weapon',
+  'weapons',
+  'vestuario',
+  'capacete',
+  'helmet',
+  'roupa',
+  'personagem',
+  'personagens',
+  'character',
+  'characters',
+  'modelo',
+  'model',
+  'asset',
+  'assets',
+  'public',
+])
 const STOP_WORDS = new Set([
   'a',
   'o',
@@ -153,12 +177,22 @@ const TOKEN_ALIASES: Record<string, string[]> = {
   agente: ['agent'],
   animacao: ['animation', 'idle', 'walk'],
   animacoes: ['animation', 'idle', 'walk'],
+  arma: ['weapon', 'sword', 'katana', 'club'],
+  armas: ['weapon', 'sword', 'katana', 'club'],
   camera: ['camera'],
+  capacete: ['helmet'],
+  character: ['player', 'personagem'],
   chat: ['prompt', 'conversation', 'messages'],
   controle: ['controller', 'input'],
   endpoint: ['api', 'route', 'prompts'],
+  equipment: ['helmet', 'shoulderpads', 'sword', 'katana', 'club'],
   mapa: ['map', 'world', 'hex', 'tile'],
+  modelo: ['model', 'asset', 'public'],
   personagem: ['player'],
+  personagens: ['player', 'character'],
+  public: ['asset', 'model'],
+  roupa: ['helmet', 'shoulderpads'],
+  vestuario: ['helmet', 'shoulderpads'],
 }
 
 function normalizeText(value: string) {
@@ -206,6 +240,104 @@ async function collectCodeFiles(root: string, workspaceRoot: string): Promise<st
   }
 
   return files
+}
+
+async function collectPublicAssetFiles(root: string, workspaceRoot: string): Promise<string[]> {
+  const entries = await readdir(root, { withFileTypes: true }).catch(() => [])
+  const files: string[] = []
+
+  for (const entry of entries) {
+    const fullPath = join(root, entry.name)
+
+    if (entry.isDirectory()) {
+      files.push(...(await collectPublicAssetFiles(fullPath, workspaceRoot)))
+      continue
+    }
+
+    if (!PUBLIC_ASSET_EXTENSIONS.has(extname(entry.name).toLowerCase())) {
+      continue
+    }
+
+    files.push(relative(workspaceRoot, fullPath))
+  }
+
+  return files
+}
+
+function classifyPublicAsset(relPath: string) {
+  const normalized = normalizeText(relPath)
+
+  if (normalized.includes('helmet') || normalized.includes('shoulderpads')) {
+    return 'vestuario'
+  }
+
+  if (
+    normalized.includes('sword') ||
+    normalized.includes('katana') ||
+    normalized.includes('club')
+  ) {
+    return 'armas'
+  }
+
+  if (normalized.includes('character')) {
+    return 'personagens'
+  }
+
+  return 'outros'
+}
+
+function formatPublicAssetName(relPath: string) {
+  const parts = relPath.split('/')
+  return parts[parts.length - 1]
+}
+
+async function buildPublicAssetContext(workspaceRoot: string, tokens: string[]) {
+  const publicFiles = await collectPublicAssetFiles(join(workspaceRoot, 'public'), workspaceRoot)
+
+  if (publicFiles.length === 0) {
+    return []
+  }
+
+  const shouldInclude =
+    tokens.length === 0 ||
+    tokens.some((token) => PUBLIC_ASSET_TOKEN_HINTS.has(token) || token in TOKEN_ALIASES)
+
+  if (!shouldInclude) {
+    return []
+  }
+
+  const grouped = {
+    armas: [] as string[],
+    personagens: [] as string[],
+    vestuario: [] as string[],
+  }
+
+  for (const relPath of publicFiles) {
+    const category = classifyPublicAsset(relPath)
+
+    if (category === 'outros') {
+      continue
+    }
+
+    grouped[category].push(formatPublicAssetName(relPath))
+  }
+
+  const formatSummaryLine = (label: string, files: string[]) =>
+    files.length > 0 ? `- ${label}: ${files.sort().join(', ')}.` : null
+
+  const formatSet = Array.from(
+    new Set(publicFiles.map((relPath) => extname(relPath).toLowerCase())),
+  ).sort()
+
+  const lines = [
+    'Assets relevantes em public:',
+    formatSummaryLine('Personagens', grouped.personagens),
+    formatSummaryLine('Vestuario', grouped.vestuario),
+    formatSummaryLine('Armas', grouped.armas),
+    formatSet.length > 0 ? `- Formatos encontrados: ${formatSet.join(', ')}.` : null,
+  ].filter((line): line is string => Boolean(line))
+
+  return lines.length > 1 ? lines : []
 }
 
 function matchTokens(
@@ -270,6 +402,7 @@ export function createGameProjectContextBuilder(): GameProjectContextBuilder {
       const tokens = extractTokens(message)
       const prioritySummaries: string[] = []
       const gameMatches: ScoredFile[] = []
+      const publicAssetContext = await buildPublicAssetContext(workspaceRoot, tokens)
 
       for (const definition of PRIORITY_FILES) {
         const filePath = join(workspaceRoot, definition.path)
@@ -367,6 +500,7 @@ export function createGameProjectContextBuilder(): GameProjectContextBuilder {
         'Area prioritaria: src/game',
         'Resumo atual do jogo:',
         ...prioritySummaries,
+        ...publicAssetContext,
         dedupedGameMatches.length > 0
           ? 'Arquivos mais relacionados ao pedido:'
           : 'Arquivos mais relacionados ao pedido: nenhum match forte; use o resumo base do jogo.',
