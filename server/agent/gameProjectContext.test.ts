@@ -101,15 +101,28 @@ describe('gameProjectContext', () => {
       join(workspaceRoot, 'public/Knight Character Animated by Quaternius/OBJ/Helmet2.glb'),
       '',
     )
+    await writeFile(
+      join(workspaceRoot, 'public/Knight Character Animated by Quaternius/OBJ/KnightCharacter.glb'),
+      '',
+    )
+    await writeFile(
+      join(workspaceRoot, 'public/Knight Character Animated by Quaternius/OBJ/ShoulderPads.glb'),
+      '',
+    )
 
     const builder = createGameProjectContextBuilder()
     const context = await builder.build({
-      message: 'quero usar arma e capacete do public no agente',
+      message: 'quero usar arma e capacete do public no agente e inserir utilitarios no personagem',
       workspaceRoot,
     })
 
     expect(context).toContain('Assets relevantes em public:')
     expect(context).toContain('Vestuario: Helmet2.glb')
     expect(context).toContain('Armas: Katana.glb')
+    expect(context).toContain('Guia de encaixe de utilitarios no personagem:')
+    expect(context).toContain('cabeca -> helmets')
+    expect(context).toContain('torso -> shoulderpads e utilitarios centrais')
+    expect(context).toContain('bracos/maos -> armas e itens segurados')
+    expect(context).toContain('pernas -> utilitarios presos ao quadril, cinto ou laterais das pernas')
   })
 })

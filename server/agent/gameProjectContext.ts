@@ -130,6 +130,19 @@ const PUBLIC_ASSET_TOKEN_HINTS = new Set([
   'vestuario',
   'capacete',
   'helmet',
+  'utilitario',
+  'utilitarios',
+  'head',
+  'torso',
+  'arm',
+  'arms',
+  'leg',
+  'legs',
+  'cabeca',
+  'braco',
+  'bracos',
+  'perna',
+  'pernas',
   'roupa',
   'personagem',
   'personagens',
@@ -179,7 +192,10 @@ const TOKEN_ALIASES: Record<string, string[]> = {
   animacoes: ['animation', 'idle', 'walk'],
   arma: ['weapon', 'sword', 'katana', 'club'],
   armas: ['weapon', 'sword', 'katana', 'club'],
+  braco: ['arm', 'arms', 'hand', 'weapon'],
+  bracos: ['arm', 'arms', 'hand', 'weapon'],
   camera: ['camera'],
+  cabeca: ['head', 'helmet'],
   capacete: ['helmet'],
   character: ['player', 'personagem'],
   chat: ['prompt', 'conversation', 'messages'],
@@ -190,8 +206,13 @@ const TOKEN_ALIASES: Record<string, string[]> = {
   modelo: ['model', 'asset', 'public'],
   personagem: ['player'],
   personagens: ['player', 'character'],
+  perna: ['leg', 'legs', 'hip'],
+  pernas: ['leg', 'legs', 'hip'],
   public: ['asset', 'model'],
   roupa: ['helmet', 'shoulderpads'],
+  torso: ['chest', 'body', 'shoulderpads'],
+  utilitario: ['equipment', 'helmet', 'shoulderpads', 'weapon'],
+  utilitarios: ['equipment', 'helmet', 'shoulderpads', 'weapon'],
   vestuario: ['helmet', 'shoulderpads'],
 }
 
@@ -328,6 +349,11 @@ async function buildPublicAssetContext(workspaceRoot: string, tokens: string[]) 
   const formatSet = Array.from(
     new Set(publicFiles.map((relPath) => extname(relPath).toLowerCase())),
   ).sort()
+  const shouldIncludeAttachmentGuide = tokens.some((token) =>
+    ['utilitario', 'utilitarios', 'equipment', 'helmet', 'capacete', 'arma', 'armas'].includes(
+      token,
+    ),
+  )
 
   const lines = [
     'Assets relevantes em public:',
@@ -335,6 +361,15 @@ async function buildPublicAssetContext(workspaceRoot: string, tokens: string[]) 
     formatSummaryLine('Vestuario', grouped.vestuario),
     formatSummaryLine('Armas', grouped.armas),
     formatSet.length > 0 ? `- Formatos encontrados: ${formatSet.join(', ')}.` : null,
+    shouldIncludeAttachmentGuide ? 'Guia de encaixe de utilitarios no personagem:' : null,
+    shouldIncludeAttachmentGuide ? '- cabeca -> helmets e adornos de topo.' : null,
+    shouldIncludeAttachmentGuide
+      ? '- torso -> shoulderpads e utilitarios centrais presos ao corpo.'
+      : null,
+    shouldIncludeAttachmentGuide ? '- bracos/maos -> armas e itens segurados.' : null,
+    shouldIncludeAttachmentGuide
+      ? '- pernas -> utilitarios presos ao quadril, cinto ou laterais das pernas.'
+      : null,
   ].filter((line): line is string => Boolean(line))
 
   return lines.length > 1 ? lines : []
