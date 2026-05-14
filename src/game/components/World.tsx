@@ -1,8 +1,9 @@
 import { Player } from './Player'
 import { ThirdPersonCamera } from './ThirdPersonCamera'
-import type { Position3D } from '../types/game'
+import type { DirectionInput, Position3D } from '../types/game'
 
 type WorldProps = {
+  playerDirection: DirectionInput
   playerPosition: Position3D
   onPlayerFrame: (delta: number) => void
 }
@@ -11,15 +12,15 @@ function House({
   baseColor,
   position,
   roofColor,
-  testId,
+  name,
 }: {
   baseColor: string
+  name?: string
   position: [number, number, number]
   roofColor: string
-  testId?: string
 }) {
   return (
-    <group data-testid={testId} position={position}>
+    <group name={name} position={position}>
       <mesh castShadow position={[0, 0.9, 0]}>
         <boxGeometry args={[1.9, 1.8, 1.7]} />
         <meshStandardMaterial color={baseColor} roughness={0.96} />
@@ -37,16 +38,16 @@ function House({
 }
 
 function BorderWall({
+  name,
   position,
   size,
-  testId,
 }: {
+  name?: string
   position: [number, number, number]
   size: [number, number, number]
-  testId?: string
 }) {
   return (
-    <mesh castShadow data-testid={testId} position={position} receiveShadow>
+    <mesh castShadow name={name} position={position} receiveShadow>
       <boxGeometry args={size} />
       <meshStandardMaterial color="#948e89" roughness={0.96} />
     </mesh>
@@ -82,7 +83,7 @@ function Fence({
   )
 }
 
-export function World({ playerPosition, onPlayerFrame }: WorldProps) {
+export function World({ playerDirection, playerPosition, onPlayerFrame }: WorldProps) {
   return (
     <>
       <color attach="background" args={['#7ba4b8']} />
@@ -104,7 +105,7 @@ export function World({ playerPosition, onPlayerFrame }: WorldProps) {
       </mesh>
 
       <mesh
-        data-testid="world-plaza"
+        name="world-plaza"
         position={[0, -0.24, 0]}
         receiveShadow
         rotation={[-Math.PI / 2, 0, 0]}
@@ -118,16 +119,16 @@ export function World({ playerPosition, onPlayerFrame }: WorldProps) {
         <meshStandardMaterial color="#76814f" roughness={1} />
       </mesh>
 
-      <BorderWall position={[0, -0.18, -5.2]} size={[9.4, 0.72, 0.82]} testId="world-border-north" />
+      <BorderWall position={[0, -0.18, -5.2]} size={[9.4, 0.72, 0.82]} name="world-border-north" />
       <BorderWall position={[0, -0.18, 5.2]} size={[9.4, 0.72, 0.82]} />
       <BorderWall position={[-5.2, -0.18, 0]} size={[0.82, 0.72, 9.4]} />
       <BorderWall position={[5.2, -0.18, 0]} size={[0.82, 0.72, 9.4]} />
 
       <House
         baseColor="#948e89"
+        name="world-house-west"
         position={[-3.25, -0.12, -2.9]}
         roofColor="#6b5b4f"
-        testId="world-house-west"
       />
       <House
         baseColor="#8f897e"
@@ -155,7 +156,7 @@ export function World({ playerPosition, onPlayerFrame }: WorldProps) {
         <meshStandardMaterial color="#6a5848" roughness={0.94} />
       </mesh>
 
-      <Player onFrame={onPlayerFrame} position={playerPosition} />
+      <Player direction={playerDirection} onFrame={onPlayerFrame} position={playerPosition} />
       <ThirdPersonCamera target={playerPosition} />
     </>
   )

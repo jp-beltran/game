@@ -32,17 +32,17 @@ describe('GameCanvas', () => {
   })
 
   it('renders the player placeholder', () => {
-    render(<GameCanvas />)
+    const { container } = render(<GameCanvas />)
 
-    expect(screen.getByTestId('player-model')).toBeInTheDocument()
+    expect(container.querySelector('group[name="player-model-idle"]')).toBeInTheDocument()
   })
 
   it('renders the diorama landmarks around the player', () => {
-    render(<GameCanvas />)
+    const { container } = render(<GameCanvas />)
 
-    expect(screen.getByTestId('world-plaza')).toBeInTheDocument()
-    expect(screen.getByTestId('world-house-west')).toBeInTheDocument()
-    expect(screen.getByTestId('world-border-north')).toBeInTheDocument()
+    expect(container.querySelector('mesh[name="world-plaza"]')).toBeInTheDocument()
+    expect(container.querySelector('group[name="world-house-west"]')).toBeInTheDocument()
+    expect(container.querySelector('mesh[name="world-border-north"]')).toBeInTheDocument()
   })
 
   it('shows the player position debug in test environment', () => {
