@@ -168,7 +168,7 @@ export function World({ playerMotion, playerPosition, onPlayerFrame }: WorldProp
       })}
 
       <Player
-        animationName={playerMotion.isMoving ? 'Walk' : undefined}
+        isMoving={playerMotion.isMoving}
         position={[playerPosition.x, playerPosition.y, playerPosition.z]}
         rotation={[0, playerMotion.facingAngle, 0]}
         scale={0.3}
