@@ -1,4 +1,5 @@
 import { useFrame } from '@react-three/fiber'
+import { useMemo } from 'react'
 
 import { Player } from './Player'
 import { ThirdPersonCamera } from './ThirdPersonCamera'
@@ -7,9 +8,11 @@ import {
   HEX_TILE_RADIUS,
   hexToWorldPosition,
 } from '../engine/movement'
+import { getVisibleTiles, getTileKey } from '../fog-of-war/getVisibleTiles'
 import type { HexCoordinate, PlayerMotion, Position3D } from '../types/game'
 
 type WorldProps = {
+  playerHex: HexCoordinate
   playerMotion: PlayerMotion
   playerPosition: Position3D
   onPlayerFrame: (delta: number) => void
@@ -33,7 +36,13 @@ type TreeScenery = {
   trunkHeight: number
 }
 
-const MAP_RADIUS = 4
+type GrassClumpScenery = {
+  accentColor: string
+  bladeColor: string
+  offsetX: number
+  offsetZ: number
+  scale: number
+}
 
 const BIOMES: HexBiome[] = [
   { color: '#8f7650', key: 'badlands' },
@@ -50,7 +59,7 @@ function resolveBiome(coordinate: HexCoordinate) {
   return BIOMES[index]
 }
 
-function createHexMap(radius: number): HexTile[] {
+function createHexMap(center: HexCoordinate, radius: number): HexTile[] {
   const tiles: HexTile[] = []
 
   for (let q = -radius; q <= radius; q += 1) {
@@ -58,7 +67,7 @@ function createHexMap(radius: number): HexTile[] {
     const maxR = Math.min(radius, -q + radius)
 
     for (let r = minR; r <= maxR; r += 1) {
-      const coordinate = { q, r }
+      const coordinate = { q: center.q + q, r: center.r + r }
 
       tiles.push({
         biome: resolveBiome(coordinate),
@@ -101,12 +110,51 @@ function resolveTreeScenery({ biome, coordinate }: HexTile): TreeScenery | null 
   }
 }
 
-const HEX_MAP = createHexMap(MAP_RADIUS)
+function resolveGrassClumpScenery({ biome, coordinate }: HexTile): GrassClumpScenery | null {
+  if (coordinate.q === 0 && coordinate.r === 0) {
+    return null
+  }
 
-export function World({ playerMotion, playerPosition, onPlayerFrame }: WorldProps) {
+  const seed =
+    Math.abs(coordinate.q * 29 + coordinate.r * 41 + (coordinate.q - coordinate.r) * 17) + 1
+
+  if (seed % 3 !== 0) {
+    return null
+  }
+
+  const paletteByBiome: Record<string, Pick<GrassClumpScenery, 'accentColor' | 'bladeColor'>> = {
+    badlands: { accentColor: '#8c8a5a', bladeColor: '#6f7444' },
+    brush: { accentColor: '#7b9154', bladeColor: '#5e7b41' },
+    dunes: { accentColor: '#a89e68', bladeColor: '#8d8a4f' },
+    highlands: { accentColor: '#6f8a54', bladeColor: '#537042' },
+  }
+
+  const palette = paletteByBiome[biome.key] ?? paletteByBiome.brush
+
+  return {
+    accentColor: palette.accentColor,
+    bladeColor: palette.bladeColor,
+    offsetX: ((seed % 7) - 3) * 0.09,
+    offsetZ: ((Math.floor(seed / 7) % 7) - 3) * 0.09,
+    scale: 0.72 + (seed % 4) * 0.08,
+  }
+}
+
+const MAP_RADIUS = 6
+
+export function World({ playerHex, playerMotion, playerPosition, onPlayerFrame }: WorldProps) {
   useFrame((_, delta) => {
     onPlayerFrame(delta)
   })
+
+  const hexMap = useMemo(() => createHexMap(playerHex, MAP_RADIUS), [playerHex])
+
+  const visibleTiles = useMemo(() => {
+    return getVisibleTiles({
+      playerCoordinate: playerHex,
+      visionRange: 3,
+    })
+  }, [playerHex])
 
   return (
     <>
@@ -123,9 +171,11 @@ export function World({ playerMotion, playerPosition, onPlayerFrame }: WorldProp
         shadow-mapSize-width={2048}
       />
 
-      {HEX_MAP.map(({ biome, coordinate }) => {
+      {hexMap.map(({ biome, coordinate }) => {
         const position = hexToWorldPosition(coordinate)
         const tree = resolveTreeScenery({ biome, coordinate })
+        const grassClump = resolveGrassClumpScenery({ biome, coordinate })
+        const isVisible = visibleTiles.has(getTileKey(coordinate.q, coordinate.r))
 
         return (
           <group key={`${coordinate.q}:${coordinate.r}`} name={`world-cell-${coordinate.q}-${coordinate.r}`}>
@@ -139,8 +189,27 @@ export function World({ playerMotion, playerPosition, onPlayerFrame }: WorldProp
               <cylinderGeometry
                 args={[HEX_TILE_RADIUS, HEX_TILE_RADIUS * 1.04, HEX_TILE_HEIGHT, 6]}
               />
-              <meshStandardMaterial color={biome.color} roughness={0.94} />
+              <meshStandardMaterial 
+                color={biome.color} 
+                roughness={0.94}
+              />
             </mesh>
+
+            {!isVisible && (
+              <mesh
+                position={[position.x, HEX_TILE_HEIGHT / 2, position.z]}
+              >
+                <cylinderGeometry
+                  args={[HEX_TILE_RADIUS, HEX_TILE_RADIUS, HEX_TILE_HEIGHT * 2, 6]}
+                />
+                <meshStandardMaterial 
+                  color="#b3c6c3" 
+                  roughness={1}
+                  transparent={true}
+                  opacity={0.85}
+                />
+              </mesh>
+            )}
 
             {tree ? (
               <group
@@ -148,6 +217,7 @@ export function World({ playerMotion, playerPosition, onPlayerFrame }: WorldProp
                 name={`world-tree-${coordinate.q}-${coordinate.r}`}
                 position={[position.x + tree.offsetX, 0, position.z + tree.offsetZ]}
                 scale={tree.scale}
+                visible={isVisible}
               >
                 <mesh castShadow position={[0, tree.trunkHeight / 2, 0]}>
                   <cylinderGeometry args={[0.08, 0.11, tree.trunkHeight, 7]} />
@@ -160,6 +230,29 @@ export function World({ playerMotion, playerPosition, onPlayerFrame }: WorldProp
                 <mesh castShadow position={[0, tree.trunkHeight + 0.62, 0]}>
                   <coneGeometry args={[0.24, 0.42, 8]} />
                   <meshStandardMaterial color="#8f9b62" roughness={0.94} />
+                </mesh>
+              </group>
+            ) : null}
+
+            {grassClump ? (
+              <group
+                data-scenery="grass-clump"
+                name={`world-grass-${coordinate.q}-${coordinate.r}`}
+                position={[position.x + grassClump.offsetX, HEX_TILE_HEIGHT / 2 - 0.02, position.z + grassClump.offsetZ]}
+                scale={grassClump.scale}
+                visible={isVisible}
+              >
+                <mesh castShadow position={[-0.08, 0.18, 0.02]} rotation={[0.08, 0.18, 0.2]}>
+                  <coneGeometry args={[0.045, 0.32, 5]} />
+                  <meshStandardMaterial color={grassClump.bladeColor} roughness={0.96} />
+                </mesh>
+                <mesh castShadow position={[0.05, 0.16, -0.04]} rotation={[-0.12, -0.22, -0.1]}>
+                  <coneGeometry args={[0.04, 0.28, 5]} />
+                  <meshStandardMaterial color={grassClump.accentColor} roughness={0.95} />
+                </mesh>
+                <mesh castShadow position={[0, 0.21, 0.06]} rotation={[0.14, 0.06, -0.18]}>
+                  <coneGeometry args={[0.042, 0.34, 5]} />
+                  <meshStandardMaterial color={grassClump.bladeColor} roughness={0.94} />
                 </mesh>
               </group>
             ) : null}

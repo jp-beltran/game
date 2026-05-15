@@ -2,6 +2,14 @@ import { render, screen } from '@testing-library/react'
 
 import { GameCanvas } from './GameCanvas'
 
+vi.mock('./Player', () => ({
+  Player: ({
+    isMoving = false,
+  }: {
+    isMoving?: boolean
+  }) => <group name={isMoving ? 'player-model-moving' : 'player-model-idle'} />,
+}))
+
 vi.mock('@react-three/fiber', async () => {
   const actual =
     await vi.importActual<typeof import('@react-three/fiber')>('@react-three/fiber')
@@ -55,6 +63,13 @@ describe('GameCanvas', () => {
 
     expect(container.querySelectorAll('group[data-scenery="tree"]').length).toBeGreaterThanOrEqual(8)
     expect(container.querySelector('group[name="world-tree-0-0"]')).not.toBeInTheDocument()
+  })
+
+  it('renders low vegetation clumps scattered across the map', () => {
+    const { container } = render(<GameCanvas />)
+
+    expect(container.querySelectorAll('group[data-scenery="grass-clump"]').length).toBeGreaterThanOrEqual(24)
+    expect(container.querySelector('group[name="world-grass-0-0"]')).not.toBeInTheDocument()
   })
 
   it('shows the player position debug in test environment', () => {

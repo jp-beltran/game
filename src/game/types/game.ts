@@ -20,5 +20,6 @@ export type HexCoordinate = {
 
 export type PlayerMotion = {
   facingAngle: number
+  facingDirection: GridMoveDirection
   isMoving: boolean
 }

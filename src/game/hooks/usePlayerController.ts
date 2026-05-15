@@ -50,6 +50,7 @@ export function usePlayerController(options: PlayerControllerOptions = {}) {
   const [position, setPosition] = useState<Position3D>(initialPosition)
   const [motion, setMotion] = useState<PlayerMotion>({
     facingAngle: 0,
+    facingDirection: 'forward',
     isMoving: false,
   })
   const hexRef = useRef<HexCoordinate>({ ...initialHex })
@@ -123,6 +124,7 @@ export function usePlayerController(options: PlayerControllerOptions = {}) {
 
     setMotion({
       facingAngle: getFacingAngle(fromPosition, toPosition),
+      facingDirection: direction,
       isMoving: true,
     })
 
